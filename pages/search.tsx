@@ -17,6 +17,10 @@ interface TopSalaries {
 export default function Search() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassification, setSelectedClassification] = useState('');
+  const [minTopSalary, setMinTopSalary] = useState<number | ''>('');
+  const [maxTopSalary, setMaxTopSalary] = useState<number | ''>('');
+  const [minSteps, setMinSteps] = useState<number | ''>('');
+  const [maxSteps, setMaxSteps] = useState<number | ''>('');
   const [salaryData, setSalaryData] = useState<SalaryData | null>(null);
   const [topSalaries, setTopSalaries] = useState<TopSalaries | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,6 +138,43 @@ export default function Search() {
       filtered = filtered.filter(key =>
         key.startsWith(selectedClassification.toUpperCase())
       );
+    }
+
+
+    // Filter by number of steps (min/max)
+    if (minSteps !== '') {
+      filtered = filtered.filter((key) => {
+        const info = getMostRecentSalaryInfo(key);
+        return info && typeof info.stepCount === 'number' && info.stepCount >= Number(minSteps);
+      });
+    }
+    if (maxSteps !== '') {
+      filtered = filtered.filter((key) => {
+        const info = getMostRecentSalaryInfo(key);
+        return info && typeof info.stepCount === 'number' && info.stepCount <= Number(maxSteps);
+      });
+    }
+
+    // Filter by min/max top salary using topSalaries
+    if (minTopSalary !== '' && topSalaries) {
+      filtered = filtered.filter((key) => {
+        const v = topSalaries[key];
+        return typeof v === 'number' && !isNaN(v) && v >= Number(minTopSalary);
+      });
+    }
+    if (maxTopSalary !== '' && topSalaries) {
+      filtered = filtered.filter((key) => {
+        const v = topSalaries[key];
+        return typeof v === 'number' && !isNaN(v) && v <= Number(maxTopSalary);
+      });
+    }
+
+    // Filter by minimum number of steps using parsed data
+    if (minSteps !== '') {
+      filtered = filtered.filter((key) => {
+        const info = getMostRecentSalaryInfo(key);
+        return info && typeof info.stepCount === 'number' && info.stepCount >= Number(minSteps);
+      });
     }
 
     return filtered.sort();
@@ -288,6 +329,53 @@ export default function Search() {
                   </option>
                 ))}
               </datalist>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Min Top Salary (CAD)</label>
+              <input
+                type="number"
+                min={0}
+                value={minTopSalary === '' ? '' : String(minTopSalary)}
+                onChange={(e) => setMinTopSalary(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="e.g., 60000"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Top Salary (CAD)</label>
+              <input
+                type="number"
+                min={0}
+                value={maxTopSalary === '' ? '' : String(maxTopSalary)}
+                onChange={(e) => setMaxTopSalary(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="e.g., 120000"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Min Steps</label>
+              <input
+                type="number"
+                min={0}
+                value={minSteps === '' ? '' : String(minSteps)}
+                onChange={(e) => setMinSteps(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="e.g., 5"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Steps</label>
+              <input
+                type="number"
+                min={0}
+                value={maxSteps === '' ? '' : String(maxSteps)}
+                onChange={(e) => setMaxSteps(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="e.g., 10"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none"
+              />
             </div>
           </div>
 

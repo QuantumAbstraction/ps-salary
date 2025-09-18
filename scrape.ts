@@ -20,7 +20,7 @@ import * as fs from "fs/promises";
 /* ---------------- configuration ---------------- */
 
 const OUTPUT_JSON = "data/data.json";
-const POLITE_DELAY_MS = 300;
+const POLITE_DELAY_MS = 100;
 
 // Paste the full list of URLs here. These should be the "rates" pages or main
 // collective agreement pages. Fragments are ignored; the whole page is parsed.
@@ -59,7 +59,8 @@ const URLS: string[] = [
 
 type RatesEntry = {
   "effective-date": string | null;
-  [k: `step-${number}`]: number | string;
+  // allow numeric/string step values as well as auxiliary raw keys like _raw-step-1
+  [k: string]: number | string | null | undefined;
   group?: string | null;
   level?: string | null;
 };
@@ -91,14 +92,50 @@ const parseMoney = (s: string) => {
 
 const parseRange = (s: string): [number, number] | null => {
   if (!s || !s.trim()) return null;
-  // common separators: to, -, –, —
-  const txt = s.replace(/\u2013|\u2014/g, "-").replace(/\s+to\s+/i, " - ");
-  const m = txt.match(/([\d,\.]+)\s*[-]\s*([\d,\.]+)/);
-  if (!m) return null;
-  const a = Number(m[1].replace(/[^\d.]/g, ""));
-  const b = Number(m[2].replace(/[^\d.]/g, ""));
-  if (Number.isNaN(a) || Number.isNaN(b)) return null;
-  return [a, b];
+  const orig = s.trim();
+  // Normalize common dashes and spacey separators
+  let txt = orig.replace(/\u2013|\u2014/g, "-").replace(/\s+to\s+/i, " - ");
+  txt = txt.replace(/\s*‑\s*/g, " - "); // odd dash
+
+  // Try patterns in a conservative order.
+  // 1) explicit numeric pairs: "12,345 - 23,456" or "12.3 - 23.4"
+  const m1 = txt.match(/([\d,\.]+)\s*[-–—]\s*([\d,\.]+)/);
+  if (m1) {
+    const a = Number(m1[1].replace(/[^\d.]/g, ""));
+    const b = Number(m1[2].replace(/[^\d.]/g, ""));
+    if (!Number.isNaN(a) && !Number.isNaN(b)) return [a, b];
+  }
+
+  // 2) word form: "from X to Y" or "X to Y"
+  const m2 = txt.match(/from\s*([\d,\.]+)\s*to\s*([\d,\.]+)/i) || txt.match(/([\d,\.]+)\s*to\s*([\d,\.]+)/i);
+  if (m2) {
+    const a = Number(m2[1].replace(/[^\d.]/g, ""));
+    const b = Number(m2[2].replace(/[^\d.]/g, ""));
+    if (!Number.isNaN(a) && !Number.isNaN(b)) return [a, b];
+  }
+
+  // 3) open-ended patterns: "X+" or "up to Y" -> treat as single-sided ranges
+  const plus = txt.match(/([\d,\.]+)\s*\+/);
+  if (plus) {
+    const a = Number(plus[1].replace(/[^\d.]/g, ""));
+    if (!Number.isNaN(a)) return [a, a];
+  }
+  const upto = txt.match(/up to\s*([\d,\.]+)/i);
+  if (upto) {
+    const b = Number(upto[1].replace(/[^\d.]/g, ""));
+    if (!Number.isNaN(b)) return [b, b];
+  }
+
+  // 4) slash-separated like "X/Y" sometimes used -> pick both
+  const slash = txt.match(/([\d,\.]+)\s*\/\s*([\d,\.]+)/);
+  if (slash) {
+    const a = Number(slash[1].replace(/[^\d.]/g, ""));
+    const b = Number(slash[2].replace(/[^\d.]/g, ""));
+    if (!Number.isNaN(a) && !Number.isNaN(b)) return [a, b];
+  }
+
+  // Fallback: no reliable numeric pair found
+  return null;
 };
 
 const looksMoney = (s: string) => /\$?\s*\d[\d,]*(\.\d{2})?/.test(s);
@@ -193,7 +230,7 @@ const extractEffectiveDate = (text: string) => {
   return matches[matches.length - 1][1];
 };
 
-function tableToRatesBlocks($: any, $table: any): RatesEntry[] {
+function tableToRatesBlocks($: any, $table: any, sourceUrl?: string): RatesEntry[] {
   const caption = clean($table.find("caption").first().text());
   const pageOrPrevText = clean($table.prev().text());
   const captionOrPrevEff =
@@ -245,16 +282,29 @@ function tableToRatesBlocks($: any, $table: any): RatesEntry[] {
       eff = null;
     }
 
-    const entry: RatesEntry = { "effective-date": eff } as RatesEntry;
+  const entry: RatesEntry = { "effective-date": eff } as RatesEntry;
+  // record the source page for this block so consumers can trace origin
+  if (sourceUrl) entry["_source"] = sourceUrl;
     let n = 1;
     for (const sc of stepCols) {
       const i = sc.idx;
       const cell = clean(row[i] ?? "");
 
-      // If header or cell looks like a range, store as a single string into step-n
-      const looksRange = sc.isRange || /\bto\b|\u2013|\u2014|\s-\s/.test(cell);
+      // If header or cell looks like a range, try to split into min/max steps
+      const looksRange = sc.isRange || /\bto\b|\u2013|\u2014|\s-\s|\+/.test(cell);
       if (looksRange) {
-        // Preserve original formatting where possible
+        // Try to parse the numeric range (e.g. "50,000 - 60,000")
+        const range = parseRange(cell);
+        if (range && range.length === 2) {
+          // map min -> step-n, max -> step-(n+1)
+          entry[`step-${n}`] = range[0];
+          entry[`_raw-step-${n}`] = cell;
+          entry[`step-${n + 1}`] = range[1];
+          entry[`_raw-step-${n + 1}`] = cell;
+          n += 2;
+          continue;
+        }
+        // Fallback: preserve original formatting where possible
         entry[`step-${n}`] = cell;
         n++;
         continue;
@@ -308,7 +358,7 @@ function findAppendixOrRatesStarts($: any) {
   });
 }
 
-function parseAppendixInNodes($: any, nodes: any[]) {
+function parseAppendixInNodes($: any, nodes: any[], sourceUrl?: string) {
   const out: SalaryData = {};
   let currentClass: string | null = null;
 
@@ -335,7 +385,7 @@ function parseAppendixInNodes($: any, nodes: any[]) {
           .toArray()
           .map((e: any) => $(e));
 
-    for (const $t of tables) {
+  for (const $t of tables) {
       // Attempt to extract classification from the table caption first.
       const captionText = clean($t.find("caption").first().text());
       const fromCaption = firstClassificationIn(captionText ?? "") ?? null;
@@ -344,7 +394,7 @@ function parseAppendixInNodes($: any, nodes: any[]) {
 
       if (!out[useClass]) out[useClass] = { "annual-rates-of-pay": [] };
 
-      const blocks = tableToRatesBlocks($, $t);
+  const blocks = tableToRatesBlocks($, $t, sourceUrl);
       if (!blocks.length) continue;
 
       for (const block of blocks) {
@@ -396,19 +446,42 @@ function mergeData(a: SalaryData, b: SalaryData) {
 
 function sortSteps(entry: RatesEntry): RatesEntry {
   const { ["effective-date"]: eff, ...rest } = entry;
-  // steps may be numeric or string (e.g. ranges). Preserve strings.
-  const steps: Array<[number, number | string]> = Object.entries(rest)
-    .filter(([k]) => /^step-\d+$/.test(k))
-    .map(([k, v]) => {
-      const idx = Number(k.split("-")[1]);
-      // preserve original string values (ranges) and numeric values as numbers
-      if (typeof v === "string") return [idx, v];
-      return [idx, Number(v)];
-    });
-  steps.sort((x, y) => x[0] - y[0]);
+  // Collect numeric/string steps and any _raw-step metadata
+  const stepEntries: Array<[number, number | string]> = [];
+  const rawMap: Map<number, string> = new Map();
 
+  for (const [k, v] of Object.entries(rest)) {
+    const stepMatch = k.match(/^step-(\d+)$/);
+    if (stepMatch) {
+      const idx = Number(stepMatch[1]);
+      // preserve original string values (ranges) and numeric values as numbers
+      stepEntries.push([idx, typeof v === "string" ? v : Number(v)]);
+      continue;
+    }
+    const rawMatch = k.match(/^_raw-step-(\d+)$/);
+    if (rawMatch) {
+      const idx = Number(rawMatch[1]);
+      if (typeof v === "string") rawMap.set(idx, v);
+    }
+  }
+
+  stepEntries.sort((a, b) => a[0] - b[0]);
+
+  // Renumber steps sequentially to step-1 ... step-N and carry raw metadata.
   const out: RatesEntry = { "effective-date": eff ?? null } as RatesEntry;
-  for (const [n, v] of steps) out[`step-${n}`] = v;
+  let cur = 1;
+  for (const [_, val] of stepEntries) {
+    out[`step-${cur}`] = val;
+    const raw = rawMap.get(_ as number);
+    if (raw) out[`_raw-step-${cur}`] = raw;
+    cur++;
+  }
+  // Preserve other underscore-prefixed metadata (e.g. _source)
+  for (const [k, v] of Object.entries(rest)) {
+    if (k.startsWith("_") && !/^_raw-step-\d+$/.test(k)) {
+      out[k] = v as any;
+    }
+  }
   return out;
 }
 
@@ -425,13 +498,14 @@ async function fetchPage(url: string): Promise<string> {
   return html;
 }
 
+
 async function scrapeAppendixAFromPage(url: string): Promise<SalaryData> {
   const html = await fetchPage(url);
   const $ = load(html);
-  return parseAppendixFromDocument($);
+  return parseAppendixFromDocument($, url);
 }
 
-function parseAppendixFromDocument($: any): SalaryData {
+function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
   const starts = findAppendixOrRatesStarts($);
   if (!starts.length) return {};
 
@@ -494,7 +568,7 @@ function parseAppendixFromDocument($: any): SalaryData {
 
       if (!result[useClass]) result[useClass] = { "annual-rates-of-pay": [] };
 
-      const blocks = tableToRatesBlocks($, $t);
+  const blocks = tableToRatesBlocks($, $t, sourceUrl);
       for (const block of blocks) {
         const m = (fromCaption ?? useClass).match(
           /^([A-Z]{1,4})(?:-(\d{1,3}))?$/,
@@ -588,7 +662,7 @@ async function runLocalTestIfRequested() {
     const parsedPerStart: any[] = [];
     for (const $start of starts) {
       const nodes = collectUntilNextHeading($, $start);
-      parsedPerStart.push(parseAppendixInNodes($, nodes));
+      parsedPerStart.push(parseAppendixInNodes($, nodes, `local:${localPath}`));
     }
 
     const merged: SalaryData = {};

@@ -23,6 +23,7 @@ export default function Home() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [salaryData, setSalaryData] = useState<SalaryData | null>(null);
   const [topSalaries, setTopSalaries] = useState<TopSalaries | null>(null);
+  const [popularList, setPopularList] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
@@ -48,8 +49,10 @@ export default function Home() {
         if (dataResponse.ok && topResponse.ok) {
           const dataResult = await dataResponse.json();
           const topResult = await topResponse.json();
+          // topResult now has shape { top: {...}, popular: [...] }
           setSalaryData(dataResult);
-          setTopSalaries(topResult);
+          setTopSalaries(topResult.top ?? topResult);
+          setPopularList(topResult.popular ?? null);
         }
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -180,12 +183,20 @@ export default function Home() {
   };
 
   const filteredClassifications = getFilteredClassifications();
-  const stats = topSalaries ? {
-    total: Object.keys(topSalaries).length,
-    highest: Math.max(...Object.values(topSalaries).filter(val => !isNaN(val) && val > 0)),
-    lowest: Math.min(...Object.values(topSalaries).filter(val => !isNaN(val) && val > 0)),
-    average: Math.round(Object.values(topSalaries).filter(val => !isNaN(val) && val > 0).reduce((a, b) => a + b, 0) / Object.values(topSalaries).filter(val => !isNaN(val) && val > 0).length)
-  } : null;
+  const computeStats = (top: TopSalaries | null) => {
+    if (!top) return null;
+    const vals = Object.values(top)
+      .map(v => (typeof v === 'number' ? v : Number(String(v).replace(/[^0-9.]/g, ''))))
+      .filter((n) => Number.isFinite(n) && !Number.isNaN(n) && n > 0);
+    const total = vals.length;
+    if (total === 0) return { total: 0, highest: 0, lowest: 0, average: 0 };
+    const highest = Math.max(...vals);
+    const lowest = Math.min(...vals);
+    const average = Math.round(vals.reduce((a, b) => a + b, 0) / total);
+    return { total, highest, lowest, average };
+  };
+
+  const stats = computeStats(topSalaries);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-900">
@@ -465,7 +476,7 @@ export default function Home() {
           <div className="bg-white rounded-xl shadow-lg p-8 dark:bg-gray-800">
             <h2 className="text-xl font-bold mb-4 dark:text-white">Popular Classifications</h2>
             <div className="space-y-2">
-              {['CS', 'AS', 'PM', 'EC', 'FI', 'IS'].map(code => (
+              {(popularList ?? ['CS', 'AS', 'PM', 'EC', 'FI', 'IS']).map(code => (
                 <Link
                   key={code}
                   href={`/api/${code.toLowerCase()}`}

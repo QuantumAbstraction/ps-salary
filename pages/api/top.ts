@@ -26,26 +26,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Extract the top values for each code and aggregate them into an object
-    const result: any = {};
+    const topResult: Record<string, number> = {};
 
     // Loop over each key (pay scale code) in jsonData
     for (const code of Object.keys(jsonData)) {
-      if (jsonData[code]) {
-        const rates = jsonData[code]["annual-rates-of-pay"];
-        if (rates && rates.length > 0) {
-          const lastRate = rates[rates.length - 1];
-          const keys = Object.keys(lastRate);
-          if (keys.length > 0) {
-            const lastStepKey = keys[keys.length - 1];
-            if (lastRate[lastStepKey] !== undefined) {
-              result[code] = lastRate[lastStepKey];
-            }
-          }
-        }
+      try {
+        const entry = jsonData[code];
+        if (!entry) continue;
+        const rates = entry["annual-rates-of-pay"];
+        if (!rates || rates.length === 0) continue;
+        const lastRate = rates[rates.length - 1];
+        const stepKeys = Object.keys(lastRate).filter(k => /^step-\d+$/.test(k));
+        if (stepKeys.length === 0) continue;
+        const lastStepKey = stepKeys.sort((a,b) => Number(a.split('-')[1]) - Number(b.split('-')[1]))[stepKeys.length -1];
+        const val = lastRate[lastStepKey];
+        const num = typeof val === 'number' ? val : Number(String(val).replace(/[^0-9.]/g, ''));
+        if (!Number.isNaN(num)) topResult[code] = num;
+      } catch (e) {
+        // ignore malformed entries
+        continue;
       }
     }
 
-    res.status(200).json(result);
+    // Build a popular list: prefer these codes but substitute if missing
+    const preferred = ['IT', 'AS', 'PM', 'EC', 'FI', 'IS'];
+    const popular: string[] = [];
+
+    // helper: sorted codes by top salary desc
+    const sortedByTop = Object.entries(topResult)
+      .sort((a,b) => (b[1] as number) - (a[1] as number))
+      .map(([k]) => k);
+
+    for (const p of preferred) {
+      if (popular.length >= preferred.length) break;
+      // exact match first (like 'CS') or codes that start with the prefix (CS-01 etc.)
+      const exact = sortedByTop.find(k => k.toUpperCase() === p.toUpperCase());
+      if (exact) {
+        popular.push(exact);
+        continue;
+      }
+      const starts = sortedByTop.find(k => k.toUpperCase().startsWith(p.toUpperCase() + '-'));
+      if (starts) {
+        popular.push(starts);
+        continue;
+      }
+      // otherwise pick a top available code not already picked
+      const fallback = sortedByTop.find(k => !popular.includes(k));
+      if (fallback) popular.push(fallback);
+    }
+
+    // if we still have fewer than preferred length, fill from sorted list
+    for (const k of sortedByTop) {
+      if (popular.length >= preferred.length) break;
+      if (!popular.includes(k)) popular.push(k);
+    }
+
+    res.status(200).json({ top: topResult, popular });
 
   } catch (error) {
     console.error(error);
