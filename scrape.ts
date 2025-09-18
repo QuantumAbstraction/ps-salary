@@ -614,4 +614,4 @@ async function runLocalTestIfRequested() {
   if (!didLocal) await main();
 })();
 
-export { main, scrapeAppendixAFromPage };
+export { main, scrapeAppendixAFromPage, scrapeAll, URLS };

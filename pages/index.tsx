@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 
 interface SalaryData {
   [key: string]: {
@@ -221,6 +222,8 @@ export default function Home() {
               >
                 📊 API Documentation
               </a>
+              {/* Admin refresh button */}
+              <RefreshButton />
             </div>
           </div>
         </div>
@@ -479,5 +482,47 @@ export default function Home() {
         
       </div>
     </main>
+  );
+}
+
+function RefreshButton() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const runRefresh = async () => {
+    setIsLoading(true);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/scraper', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setMsg(`Refreshed: ${data.newClassifications} classifications`);
+      } else {
+        setMsg(`Error: ${data.error || data.message || 'unknown'}`);
+      }
+    } catch (e) {
+      setMsg(`Network error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsLoading(false);
+      // Hide message after 8s
+      setTimeout(() => setMsg(null), 8000);
+    }
+  };
+
+  return (
+    <div className="inline-flex items-center">
+      <button
+        onClick={runRefresh}
+        disabled={isLoading}
+        className={`inline-flex items-center px-6 py-3 rounded-lg font-medium ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600 text-white'}`}
+      >
+        {isLoading ? 'Refreshing...' : '🔁 Refresh Data'}
+      </button>
+      {msg && (
+        <div className="ml-3 px-3 py-2 bg-white dark:bg-gray-800 rounded shadow text-sm">
+          {msg}
+        </div>
+      )}
+    </div>
   );
 }
