@@ -1,5 +1,20 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Head from 'next/head';
+import {
+  Accordion,
+  AccordionItem,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  Code,
+  Divider,
+  ScrollShadow,
+  Skeleton,
+  Spacer,
+  type ChipProps,
+} from '@heroui/react';
 
 type SalaryEntry = {
   'annual-rates-of-pay': Array<{
@@ -71,6 +86,13 @@ export default function Admin() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [persistedTotal, setPersistedTotal] = useState<number | null>(null);
 
+  const statusMeta = useMemo(() => {
+    if (isLoading) return { label: 'Running', color: 'warning' as ChipProps['color'] };
+    if (error) return { label: 'Error', color: 'danger' as ChipProps['color'] };
+    if (result) return { label: 'Completed', color: 'success' as ChipProps['color'] };
+    return { label: 'Idle', color: 'default' as ChipProps['color'] };
+  }, [error, isLoading, result]);
+
   const runScraper = async () => {
     setIsLoading(true);
     setError(null);
@@ -123,176 +145,209 @@ export default function Admin() {
     result?.processedClassifications ??
     (result?.data ? Object.keys(result.data).length : null);
 
+  const metricTiles = useMemo(
+    () => [
+      {
+        label: 'Processed this run',
+        value: formatNumber(processedThisRun),
+        helper: 'Records gathered in the latest scrape.',
+      },
+      {
+        label: 'New classifications',
+        value: formatNumber(result?.newClassifications ?? null),
+        helper: 'Fresh codes appended to data.json.',
+      },
+      {
+        label: 'Persisted total',
+        value: formatNumber(persistedTotal),
+        helper: 'Total unique classifications stored.',
+      },
+      {
+        label: 'data.json updated',
+        value: formatTimestamp(lastUpdated),
+        helper: 'Timestamp of the latest successful write.',
+      },
+    ],
+    [lastUpdated, persistedTotal, processedThisRun, result?.newClassifications]
+  );
+
   return (
     <>
       <Head>
-        <title>Admin - Salary Data Scraper</title>
+        <title>Admin — HeroUI Console</title>
       </Head>
-
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Salary Data Scraper Admin
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Run the canonical scraper to refresh salary data and persist the latest snapshot to <code>data/data.json</code>.
-            </p>
-
-            <div className="mb-6">
-              <button
-                onClick={runScraper}
-                disabled={isLoading}
-                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                  isLoading
-                    ? 'bg-gray-400 cursor-not-allowed text-gray-100'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-12">
+        <Card className="border border-content3/40 bg-content1/80 backdrop-blur-md">
+          <CardHeader className="items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-default-400">
+                Salary Data Ops
+              </p>
+              <h1 className="text-3xl font-semibold leading-tight text-foreground">
+                Public Servant Salary Scraper
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-default-400">
+                Trigger the canonical scraper, persist the dataset, and review grouped classifications in one dark-first dashboard.
+              </p>
+            </div>
+            <Chip color={statusMeta.color} variant="flat" radius="sm" className="uppercase tracking-wide">
+              {statusMeta.label}
+            </Chip>
+          </CardHeader>
+          <CardBody className="space-y-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <Button
+                color="primary"
+                size="lg"
+                variant="shadow"
+                onPress={runScraper}
+                isLoading={isLoading}
               >
-                {isLoading ? (
-                  <span className="inline-flex items-center space-x-2">
-                    <svg
-                      className="h-5 w-5 animate-spin text-white"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path
-                        className="opacity-75"
-                        d="M4 12a8 8 0 018-8v2a6 6 0 100 12v2a8 8 0 01-8-6z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                    <span>Scraping in progress...</span>
-                  </span>
-                ) : (
-                  <span>Run Scraper & Update Data</span>
-                )}
-              </button>
+                Run Scraper
+              </Button>
+              {lastUpdated && (
+                <Chip variant="bordered" color="secondary" radius="sm">
+                  Last run: {formatTimestamp(lastUpdated)}
+                </Chip>
+              )}
+              {persistedTotal !== null && (
+                <Chip variant="bordered" radius="sm">
+                  Stored records: {formatNumber(persistedTotal)}
+                </Chip>
+              )}
             </div>
 
             {isLoading && (
-              <div className="mb-6">
-                <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2 w-3/4"></div>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 mt-4">
-                  This may take a few minutes while the latest classifications are retrieved and persisted...
-                </p>
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-2/3 rounded-lg" />
+                <Skeleton className="h-4 w-3/4 rounded-lg" />
+                <Skeleton className="h-4 w-1/2 rounded-lg" />
               </div>
             )}
 
             {error && (
-              <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/20 border border-red-400 text-red-700 dark:text-red-400 rounded">
-                <h3 className="font-semibold mb-2">Error occurred:</h3>
-                <p>{error}</p>
-              </div>
+              <Card className="border-danger-500/40 bg-danger-500/10">
+                <CardBody className="space-y-2">
+                  <Chip color="danger" variant="flat" radius="sm" className="self-start uppercase">
+                    Error
+                  </Chip>
+                  <p className="text-sm text-danger-200">{error}</p>
+                </CardBody>
+              </Card>
             )}
 
             {result && (
-              <div className="mb-6 p-4 bg-green-100 dark:bg-green-900/20 border border-green-400 text-green-800 dark:text-green-300 rounded">
-                <h3 className="font-semibold">Scraping completed successfully!</h3>
+              <div className="space-y-6">
                 {result.message && (
-                  <p className="text-sm mt-1">{result.message}</p>
+                  <Card className="border-primary-500/30 bg-primary-500/5">
+                    <CardBody>
+                      <p className="text-sm text-primary-200">{result.message}</p>
+                    </CardBody>
+                  </Card>
                 )}
 
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-md bg-white/70 dark:bg-gray-900/40 border border-green-200 dark:border-green-900/40 p-3">
-                    <div className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Processed this run
-                    </div>
-                    <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {processedThisRun !== null ? formatNumber(processedThisRun) : '0'}
-                    </div>
-                  </div>
-                  <div className="rounded-md bg-white/70 dark:bg-gray-900/40 border border-green-200 dark:border-green-900/40 p-3">
-                    <div className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      New classifications added
-                    </div>
-                    <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {formatNumber(result.newClassifications ?? 0)}
-                    </div>
-                  </div>
-                  <div className="rounded-md bg-white/70 dark:bg-gray-900/40 border border-green-200 dark:border-green-900/40 p-3">
-                    <div className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      Persisted total records
-                    </div>
-                    <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {formatNumber(persistedTotal)}
-                    </div>
-                  </div>
-                  <div className="rounded-md bg-white/70 dark:bg-gray-900/40 border border-green-200 dark:border-green-900/40 p-3">
-                    <div className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                      data.json updated
-                    </div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {formatTimestamp(lastUpdated)}
-                    </div>
-                  </div>
+                <Divider className="bg-content3" />
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {metricTiles.map((item) => (
+                    <Card key={item.label} className="border border-content3/40 bg-content2/60">
+                      <CardBody className="space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-default-400">{item.label}</p>
+                        <p className="text-2xl font-semibold text-foreground">{item.value}</p>
+                        <p className="text-xs text-default-500">{item.helper}</p>
+                      </CardBody>
+                    </Card>
+                  ))}
                 </div>
 
                 {newCodes.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      New classifications added in this run
-                    </h4>
-                    <p className="mt-1 text-xs text-gray-700 dark:text-gray-300 break-words">
-                      {newCodes.join(', ')}
-                    </p>
-                  </div>
+                  <Card className="border border-content3/40 bg-content2/60">
+                    <CardHeader className="flex-col items-start gap-2">
+                      <p className="text-sm font-semibold text-foreground">New classifications</p>
+                      <p className="text-xs text-default-500">
+                        Recently appended codes in this refresh cycle.
+                      </p>
+                    </CardHeader>
+                    <CardBody className="gap-2">
+                      <ScrollShadow className="max-h-48 overflow-y-auto pr-2">
+                        <div className="flex flex-wrap gap-2">
+                          {newCodes.map((code) => (
+                            <Chip key={code} variant="flat" color="success" radius="sm">
+                              {code}
+                            </Chip>
+                          ))}
+                        </div>
+                      </ScrollShadow>
+                    </CardBody>
+                  </Card>
                 )}
 
                 {groupStats.length > 0 && (
-                  <div className="mt-6">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      Classification group totals
-                    </h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      Grouped by the alpha prefix (for example: AS-01 becomes AS).
-                    </p>
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {groupStats.map((group) => (
-                        <div
-                          key={group.group}
-                          className="border border-green-200 dark:border-green-900/40 rounded-md p-3 bg-white dark:bg-gray-900/40"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                              {group.group}
-                            </span>
-                            <span className="text-xs text-gray-600 dark:text-gray-400">
-                              {group.total} codes
-                            </span>
-                          </div>
-                          <div className="mt-2 text-xs text-gray-700 dark:text-gray-300 break-words">
-                            {group.codes.slice(0, 8).join(', ')}
-                            {group.codes.length > 8 && (
-                              <span> +{group.codes.length - 8} more</span>
-                            )}
-                          </div>
+                  <Card className="border border-content3/40 bg-content2/60">
+                    <CardHeader className="flex-col items-start gap-2">
+                      <p className="text-sm font-semibold text-foreground">Classification group totals</p>
+                      <p className="text-xs text-default-500">
+                        Grouped by the alpha prefix (for example: AS-01 → AS).
+                      </p>
+                    </CardHeader>
+                    <CardBody>
+                      <ScrollShadow className="max-h-80 overflow-y-auto pr-2">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {groupStats.map((group) => (
+                            <Card
+                              key={group.group}
+                              className="border border-content3/40 bg-content1/70"
+                            >
+                              <CardBody className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Chip size="sm" color="secondary" variant="flat" radius="sm">
+                                    {group.group}
+                                  </Chip>
+                                  <span className="text-xs text-default-500">{group.total} codes</span>
+                                </div>
+                                <p className="text-xs leading-relaxed text-default-400">
+                                  {group.codes.slice(0, 10).join(', ')}
+                                  {group.codes.length > 10 && (
+                                    <span className="text-default-500"> +{group.codes.length - 10} more</span>
+                                  )}
+                                </p>
+                              </CardBody>
+                            </Card>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </ScrollShadow>
+                    </CardBody>
+                  </Card>
                 )}
 
                 {result.data && Object.keys(result.data).length > 0 && (
-                  <details className="mt-4">
-                    <summary className="cursor-pointer font-medium">
-                      View scraped data
-                    </summary>
-                    <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-64">
-                      {JSON.stringify(result.data, null, 2)}
-                    </pre>
-                  </details>
+                  <Accordion variant="bordered" defaultExpandedKeys={['raw']}
+                    className="bg-content2/70 border border-content3/40"
+                  >
+                    <AccordionItem
+                      key="raw"
+                      aria-label="Raw payload"
+                      title={
+                        <div className="flex items-center gap-2">
+                          <Chip size="sm" variant="flat" color="secondary" radius="sm">
+                            JSON
+                          </Chip>
+                          <span>View raw response</span>
+                        </div>
+                      }
+                    >
+                      <Code className="block max-h-72 overflow-auto text-xs">
+                        {JSON.stringify(result.data, null, 2)}
+                      </Code>
+                    </AccordionItem>
+                  </Accordion>
                 )}
               </div>
             )}
-          </div>
-        </div>
+          </CardBody>
+        </Card>
+
+        <Spacer y={4} />
       </div>
     </>
   );
