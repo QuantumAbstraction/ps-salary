@@ -48,9 +48,14 @@ export default function Equivalency() {
 
         const dataResult = await dataResponse.json();
         const topResult = await topResponse.json();
+        const normalizedTop = topResult?.top ?? topResult;
+
+        if (!normalizedTop || typeof normalizedTop !== 'object') {
+          throw new Error('Invalid top salary payload');
+        }
 
         setSalaryData(dataResult);
-        setTopSalaries(topResult);
+        setTopSalaries(normalizedTop);
       } catch (err) {
         setError('Failed to load salary data');
         console.error(err);

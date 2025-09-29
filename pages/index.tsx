@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
-
 interface SalaryData {
   [key: string]: {
     'annual-rates-of-pay': Array<{
@@ -218,23 +216,23 @@ export default function Home() {
                 href="/search"
                 className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-lg dark:bg-blue-700 dark:hover:bg-blue-800"
               >
-                🔍 Advanced Search
+                Advanced Search
               </Link>
               <Link
                 href="/equivalency"
                 className="inline-flex items-center px-6 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors shadow-lg dark:bg-purple-700 dark:hover:bg-purple-800"
               >
-                ⚖️ Salary Equivalency
+                Salary Equivalency
               </Link>
               <a
                 href="/api/data"
                 target="_blank"
                 className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors shadow-lg dark:bg-green-700 dark:hover:bg-green-800"
               >
-                📊 API Documentation
+                API Documentation
               </a>
               {/* Admin refresh button */}
-              <RefreshButton />
+              <AdminRefreshLink />
             </div>
           </div>
         </div>
@@ -476,14 +474,14 @@ export default function Home() {
           <div className="bg-white rounded-xl shadow-lg p-8 dark:bg-gray-800">
             <h2 className="text-xl font-bold mb-4 dark:text-white">Popular Classifications</h2>
             <div className="space-y-2">
-              {(popularList ?? ['CS', 'AS', 'PM', 'EC', 'FI', 'IS']).map(code => (
+              {(popularList ?? ['IT', 'AS', 'PM', 'EC', 'FI', 'IS']).map(code => (
                 <Link
                   key={code}
                   href={`/api/${code.toLowerCase()}`}
                   className="flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <span className="font-medium text-gray-800 dark:text-gray-100">{code}</span>
-                  <span className="text-blue-600 dark:text-blue-400">→</span>
+                  <span className="text-blue-600 dark:text-blue-400">Open</span>
                 </Link>
               ))}
             </div>
@@ -496,44 +494,30 @@ export default function Home() {
   );
 }
 
-function RefreshButton() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  const runRefresh = async () => {
-    setIsLoading(true);
-    setMsg(null);
-    try {
-      const res = await fetch('/api/scraper', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        setMsg(`Refreshed: ${data.newClassifications} classifications`);
-      } else {
-        setMsg(`Error: ${data.error || data.message || 'unknown'}`);
-      }
-    } catch (e) {
-      setMsg(`Network error: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setIsLoading(false);
-      // Hide message after 8s
-      setTimeout(() => setMsg(null), 8000);
-    }
-  };
-
+function AdminRefreshLink() {
   return (
-    <div className="inline-flex items-center">
-      <button
-        onClick={runRefresh}
-        disabled={isLoading}
-        className={`inline-flex items-center px-6 py-3 rounded-lg font-medium ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600 text-white'}`}
-      >
-        {isLoading ? 'Refreshing...' : '🔁 Refresh Data'}
-      </button>
-      {msg && (
-        <div className="ml-3 px-3 py-2 bg-white dark:bg-gray-800 rounded shadow text-sm">
-          {msg}
-        </div>
-      )}
-    </div>
+    <Link
+      href="/admin"
+      className="group inline-flex items-center px-6 py-3 bg-yellow-600 text-white font-medium rounded-lg hover:bg-yellow-700 transition-colors shadow-lg dark:bg-yellow-600 dark:hover:bg-yellow-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-yellow-500"
+      title="Open the admin dashboard to run the salary data scraper"
+      aria-label="Open the admin dashboard to run the salary data scraper"
+    >
+      <span className="inline-flex items-center space-x-2">
+        <svg
+          className="h-5 w-5 transition-transform duration-300 group-hover:rotate-180 group-active:scale-90"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M21 12a9 9 0 10-4.21 7.59" />
+          <polyline points="21 12 21 18 15 18" />
+        </svg>
+        <span>Refresh Data (Admin)</span>
+      </span>
+    </Link>
   );
 }
