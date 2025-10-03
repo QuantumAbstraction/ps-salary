@@ -2,25 +2,40 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
 
+// Cache the parsed data in memory to avoid reading/parsing on every request
+let cachedData: any = null;
+let lastModified: number = 0;
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    // Set cache headers for better performance
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    
     // Define the path to the JSON file
     const filePath = path.join(process.cwd(), 'data', 'data.json');
 
-    // Check if the file exists
+    // Check if the file exists and get stats
+    let fileStats;
     try {
-        await fs.access(filePath);
+        fileStats = await fs.stat(filePath);
     } catch {
         return res.status(404).json({ error: 'File not found' });
     }
 
-    // Read the file asynchronously
+    // Use cached data if file hasn't changed
+    if (cachedData && fileStats.mtime.getTime() === lastModified) {
+      return res.status(200).json(cachedData);
+    }
+
+    // Read and parse the file
     const data = await fs.readFile(filePath, 'utf8');
 
-    // Attempt to parse the JSON
     let jsonData;
     try {
       jsonData = JSON.parse(data);
+      // Cache the parsed data
+      cachedData = jsonData;
+      lastModified = fileStats.mtime.getTime();
     } catch (parseError) {
       return res.status(400).json({ error: 'Failed to parse the JSON file' });
     }

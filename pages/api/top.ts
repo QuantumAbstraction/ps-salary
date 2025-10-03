@@ -2,16 +2,29 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
 
+// Cache the computed top salaries to avoid recalculation
+let cachedTopSalaries: Record<string, number> | null = null;
+let lastModified: number = 0;
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    // Set cache headers for better performance
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    
     // Define the path to the JSON file
     const filePath = path.join(process.cwd(), 'data', 'data.json');
 
-    // Check if the file exists
+    // Check if the file exists and get stats
+    let fileStats;
     try {
-      await fs.access(filePath);
+      fileStats = await fs.stat(filePath);
     } catch {
       return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Use cached data if file hasn't changed
+    if (cachedTopSalaries && fileStats.mtime.getTime() === lastModified) {
+      return res.status(200).json({ top: cachedTopSalaries });
     }
 
     // Read the file asynchronously
@@ -80,6 +93,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (popular.length >= preferred.length) break;
       if (!popular.includes(k)) popular.push(k);
     }
+
+    // Cache the computed results
+    cachedTopSalaries = topResult;
+    lastModified = fileStats.mtime.getTime();
 
     res.status(200).json({ top: topResult, popular });
 

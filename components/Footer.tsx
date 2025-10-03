@@ -1,81 +1,93 @@
+import NextLink from 'next/link';
+import { Button, Divider, Link } from '@heroui/react';
 
-import Link from 'next/link';
+const primaryLinks = [
+  { href: '/', label: 'Home' },
+  { href: '/search', label: 'Advanced Search' },
+  { href: '/equivalency', label: 'Equivalency' },
+  { href: '/admin', label: 'Admin Console' },
+];
+
+const externalLinks = [
+  {
+    href: 'https://github.com/dougkeefe/ps-salary-data',
+    label: 'GitHub Repository',
+  },
+  {
+    href: 'https://github.com/dougkeefe/ps-salary-data/blob/main/LICENSE',
+    label: 'MIT License',
+  },
+  {
+    href: 'https://www.tbs-sct.canada.ca/pubs_pol/hrpubs/coll_agre/rates-taux-eng.asp',
+    label: 'Source (TBS-SCT Canada)',
+  },
+];
 
 export default function Footer() {
   return (
-    <footer className="bg-white border-t border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">About This API</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
-              This API provides access to publicly accessible salary information for Canadian public service classifications, 
-              sourced from{' '}
-              <a
-                href="https://www.tbs-sct.canada.ca/pubs_pol/hrpubs/coll_agre/rates-taux-eng.asp"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline dark:text-blue-400"
-              >
-                TBS-SCT Canada
-              </a>.
+    <footer className="border-t border-content3/30 bg-background/95">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid gap-10 md:grid-cols-3">
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold text-foreground">About</h3>
+            <p className="text-sm leading-relaxed text-default-500">
+              The Public Servant Salary API aggregates publicly available pay data for Canadian public service
+              classifications. Refresh the dataset via the admin console or explore real-time salary insights across
+              hundreds of classifications.
             </p>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              <p>⚠️ This API is not affiliated with the Government of Canada.</p>
-              <p>📚 Data provided for educational purposes only.</p>
+            <Button
+              as={NextLink}
+              href="/api/data"
+              size="sm"
+              variant="flat"
+              color="primary"
+              className="w-fit"
+            >
+              View API JSON
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold text-foreground">Navigation</h3>
+            <div className="grid gap-2">
+              {primaryLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  as={NextLink}
+                  href={link.href}
+                  color="foreground"
+                  className="text-sm text-default-500 hover:text-primary"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Navigation</h3>
-            <div className="space-y-2">
-              <Link href="/" className="block text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">
-                🏠 Home
-              </Link>
-              <Link href="/search" className="block text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">
-                🔍 Advanced Search
-              </Link>
-              <Link href="/equivalency" className="block text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">
-                ⚖️ Salary Equivalency
-              </Link>
-              <a
-                href="/api/data"
-                target="_blank"
-                className="block text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-              >
-                📊 API Documentation
-              </a>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Resources</h3>
-            <div className="space-y-2">
-              <a
-                href="https://github.com/dougkeefe/ps-salary-data"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-              >
-                📁 GitHub Repository
-              </a>
-              <a
-                href="https://github.com/dougkeefe/ps-salary-data/blob/main/LICENSE"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-              >
-                📜 MIT License
-              </a>
+          <div className="space-y-3">
+            <h3 className="text-base font-semibold text-foreground">Resources</h3>
+            <div className="grid gap-2">
+              {externalLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  color="foreground"
+                  className="text-sm text-default-500 hover:text-primary"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>
 
-        <hr className="my-8 border-gray-200 dark:border-gray-700" />
-        
-        <div className="text-center text-gray-500 dark:text-gray-400">
-          <p>Author: Doug Keefe • 2023</p>
-          <p className="text-sm mt-1">Edit: Fabrice Ndizihiwe • 2025</p>
+        <Divider className="bg-content3/40" />
+
+        <div className="flex flex-col items-center justify-between gap-4 text-xs text-default-500 sm:flex-row">
+          <span>Doug Keefe &copy; 2023 &mdash; Maintained by Fabrice Ndizihiwe (2025)</span>
+          <span>Built with HeroUI, Next.js, and Tailwind CSS.</span>
         </div>
       </div>
     </footer>

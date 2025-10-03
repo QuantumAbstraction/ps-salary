@@ -5,8 +5,8 @@ import { scrapeAll, URLS } from "../../scrape";
 
 type SalaryEntry = {
   "annual-rates-of-pay": Array<{
-    "effective-date": string;
-    [key: string]: string | number;
+    "effective-date": string | null;
+    [key: string]: string | number | null | undefined;
   }>;
 };
 
