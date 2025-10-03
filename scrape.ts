@@ -432,6 +432,144 @@ function tableToRatesBlocks($: any, $table: any, sourceUrl?: string, legendMap: 
   return out;
 }
 
+function tableToRatesBlocksWithRows($: any, $table: any, filteredRows: string[][], sourceUrl?: string, legendMap: Record<string, string> = {}): RatesEntry[] {
+  const { headers } = simpleTable($, $table);
+  
+  // Use filtered rows instead of all table rows
+  const rows = filteredRows;
+  
+  const caption = clean($table.find("caption").first().text());
+  
+  // Now call the existing logic with our filtered data
+  return tableToRatesBlocksFromData(headers, rows, caption, sourceUrl, legendMap);
+}
+
+function tableToRatesBlocksFromData(headers: string[], rows: string[][], caption?: string, sourceUrl?: string, legendMap: Record<string, string> = {}): RatesEntry[] {
+  // Identify columns that look like steps and mark range columns.
+  type StepCol = { idx: number; isRange: boolean };
+  const stepCols: StepCol[] = [];
+  headers.forEach((h, i) => {
+    const t = (h || "").toLowerCase();
+    // skip explicit effective date columns
+    if (/effective/.test(t) || /effective date/.test(t) || /date/.test(t))
+      return;
+    // mark columns that explicitly mention range
+    const isRangeHeader = /range/.test(t);
+    if (
+      /^(step(\s*\d+)?|\d+|rate\s*\d+|salary|pay|range)$/i.test(t) ||
+      isRangeHeader
+    ) {
+      stepCols.push({ idx: i, isRange: isRangeHeader });
+    }
+  });
+  if (!stepCols.length) {
+    // fallback: use all columns except the first (commonly effective date)
+    for (let i = 1; i < headers.length; i++)
+      stepCols.push({ idx: i, isRange: /range/.test(headers[i]) });
+  }
+
+  const out: RatesEntry[] = [];
+
+  // NEW APPROACH: If we have legend mappings and headers that look like symbols,
+  // create one entry per effective date with all salary steps
+  if (Object.keys(legendMap).length > 0) {
+    // Check if headers contain legend symbols
+    const symbolHeaders = headers.filter((h, i) => i > 0 && legendMap[clean(h)]);
+    
+    if (symbolHeaders.length > 0) {
+      // Process each symbol/effective date
+      symbolHeaders.forEach((header, headerIdx) => {
+        const symbol = clean(header);
+        const effectiveDate = legendMap[symbol];
+        
+        if (!effectiveDate) return;
+        
+        const entry: RatesEntry = { "effective-date": effectiveDate } as RatesEntry;
+        if (sourceUrl) entry["_source"] = sourceUrl;
+        
+        // For each row, get the salary value from this column
+        let stepNum = 1;
+        rows.forEach((row, rowIdx) => {
+          const columnIdx = headerIdx + 1; // +1 because we filtered out first column
+          const cellValue = clean(row[columnIdx] ?? "");
+          
+          if (cellValue) {
+            // Check if it's a range
+            const range = parseRange(cellValue);
+            if (range && range.length === 2) {
+              entry[`step-${stepNum}`] = range[0];
+              entry[`_raw-step-${stepNum}`] = cellValue;
+              entry[`step-${stepNum + 1}`] = range[1];
+              entry[`_raw-step-${stepNum + 1}`] = cellValue;
+              stepNum += 2;
+            } else {
+              const v = parseMoney(cellValue);
+              if (!Number.isNaN(v)) {
+                entry[`step-${stepNum}`] = v;
+                stepNum++;
+              }
+            }
+          }
+        });
+        
+        if (Object.keys(entry).some((k) => /^step-\d+$/.test(k))) {
+          out.push(entry);
+        }
+      });
+      
+      return out;
+    }
+  }
+
+  // FALLBACK: Original logic for non-legend tables
+  // For each data row, try to extract an effective date from the first cell
+  for (const row of rows) {
+    const rowFirst = clean(row[0] ?? "");
+    // prefer the full text (including label like "$)" or "A)" and any trailing notes)
+    const dateRe = /[A-Z]?[)\w\s\-,:]*?\b([A-Z][a-z]+ \d{1,2},? \d{4})\b/;
+    let eff: string | null = null;
+    if (dateRe.test(rowFirst)) {
+      eff = rowFirst;
+    } else if (caption && dateRe.test(caption)) {
+      eff = caption;
+    } else {
+      eff = null;
+    }
+
+    const entry: RatesEntry = { "effective-date": eff } as RatesEntry;
+    // record the source page for this block so consumers can trace origin
+    if (sourceUrl) entry["_source"] = sourceUrl;
+    let n = 1;
+    for (const sc of stepCols) {
+      const i = sc.idx;
+      const cell = clean(row[i] ?? "");
+      if (!cell) continue;
+
+      if (sc.isRange) {
+        const range = parseRange(cell);
+        if (range && range.length === 2) {
+          entry[`step-${n}`] = range[0];
+          entry[`_raw-step-${n}`] = cell;
+          entry[`step-${n + 1}`] = range[1];
+          entry[`_raw-step-${n + 1}`] = cell;
+          n += 2;
+          continue;
+        }
+      }
+
+      const v = parseMoney(cell);
+      if (!Number.isNaN(v)) {
+        entry[`step-${n}`] = v;
+        n++;
+      }
+    }
+
+    if (Object.keys(entry).some((k) => /^step-\d+$/.test(k))) out.push(entry);
+  }
+
+  return out;
+}
+
 const headingLevel = ($el: any) => {
   const tag = ($el.prop("tagName") || "").toString().toLowerCase();
   const m = tag.match(/^h([1-6])$/);
@@ -702,23 +840,114 @@ function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
       // Fallback to the start heading classification
       if (!useClass)
         useClass = firstClassificationIn(clean($start.text())) ?? null;
-      if (!useClass) continue;
 
-      if (!result[useClass]) result[useClass] = { "annual-rates-of-pay": [] };
-
-      const blocks = tableToRatesBlocks($, $t, sourceUrl, legendMap);
-      for (const block of blocks) {
-        const m = (fromCaption ?? useClass).match(
-          /^([A-Z]{1,4})(?:-(\d{1,3}))?$/,
-        );
-        if (m) {
-          block.group = m[1];
-          block.level = m[2] ?? null;
-        } else {
-          const mm = (fromCaption ?? useClass).match(/^([A-Z]{2,4})/);
-          if (mm) block.group = mm[1];
+      // NEW: Check if this table contains multiple classifications in its rows
+      const rowClassifications = new Map<string, any[]>();
+      const { headers, rows } = simpleTable($, $t);
+      
+      // Enhanced classification detection for complex tables
+      const allRowClassifications: string[] = [];
+      const rowClassificationMapping: { [rowIndex: number]: string } = {};
+      
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        let rowClass: string | null = null;
+        
+        // Try multiple approaches to find classification in this row
+        for (let cellIndex = 0; cellIndex < Math.min(3, row.length); cellIndex++) {
+          const cellText = clean(row[cellIndex] ?? "");
+          const foundClass = firstClassificationIn(cellText);
+          if (foundClass) {
+            rowClass = foundClass;
+            break;
+          }
         }
-        result[useClass]["annual-rates-of-pay"].push(block);
+        
+        // Special handling for AS tables - look for salary ranges to infer level
+        if (!rowClass && useClass && useClass.startsWith('AS')) {
+          // Look for salary values in the row to infer AS level
+          const salaryValues: number[] = [];
+          for (let j = 1; j < row.length; j++) {
+            const cellValue = clean(row[j] ?? "");
+            const money = parseMoney(cellValue);
+            if (!Number.isNaN(money) && money > 30000 && money < 200000) {
+              salaryValues.push(money);
+            }
+          }
+          
+          if (salaryValues.length > 0) {
+            const maxSalary = Math.max(...salaryValues);
+            // Infer AS level based on salary range
+            if (maxSalary >= 82000 && maxSalary <= 92000) {
+              rowClass = 'AS-04';
+            } else if (maxSalary >= 98000 && maxSalary <= 105000) {
+              rowClass = 'AS-05';
+            } else if (maxSalary >= 108000 && maxSalary <= 115000) {
+              rowClass = 'AS-06';
+            } else if (maxSalary >= 118000 && maxSalary <= 130000) {
+              rowClass = 'AS-07';
+            } else if (maxSalary >= 130000 && maxSalary <= 145000) {
+              rowClass = 'AS-08';
+            }
+          }
+        }
+        
+        if (rowClass) {
+          allRowClassifications.push(rowClass);
+          rowClassificationMapping[i] = rowClass;
+        }
+      }
+      
+      // Group rows by classification
+      for (let i = 0; i < rows.length; i++) {
+        const rowClass = rowClassificationMapping[i];
+        if (rowClass) {
+          if (!rowClassifications.has(rowClass)) {
+            rowClassifications.set(rowClass, []);
+          }
+          rowClassifications.get(rowClass)!.push(rows[i]);
+        }
+      }
+
+      // If we found multiple classifications in rows, process each separately
+      if (rowClassifications.size > 0) {
+        rowClassifications.forEach((classRows, classification) => {
+          if (!result[classification]) result[classification] = { "annual-rates-of-pay": [] };
+
+          // Create blocks using the existing tableToRatesBlocks logic but with filtered rows
+          const blocks = tableToRatesBlocksWithRows($, $t, classRows, sourceUrl, legendMap);
+          
+          for (const block of blocks) {
+            const m = classification.match(/^([A-Z]{1,4})(?:-(\d{1,3}))?$/);
+            if (m) {
+              block.group = m[1];
+              block.level = m[2] ?? null;
+            } else {
+              const mm = classification.match(/^([A-Z]{2,4})/);
+              if (mm) block.group = mm[1];
+            }
+            result[classification]["annual-rates-of-pay"].push(block);
+          }
+        });
+      } else {
+        // Fallback to original single-classification logic
+        if (!useClass) continue;
+        if (!result[useClass]) result[useClass] = { "annual-rates-of-pay": [] };
+
+        const blocks = tableToRatesBlocks($, $t, sourceUrl, legendMap);
+        for (const block of blocks) {
+          const m = (fromCaption ?? useClass).match(
+            /^([A-Z]{1,4})(?:-(\d{1,3}))?$/,
+          );
+          if (m) {
+            block.group = m[1];
+            block.level = m[2] ?? null;
+          } else {
+            const mm = (fromCaption ?? useClass).match(/^([A-Z]{2,4})/);
+            if (mm) block.group = mm[1];
+          }
+          result[useClass]["annual-rates-of-pay"].push(block);
+        }
       }
     }
   }

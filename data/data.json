@@ -2108,39 +2108,6 @@
       }
     ]
   },
-  "FI": {
-    "annual-rates-of-pay": [
-      {
-        "effective-date": "$) November 7, 2021",
-        "step-1": 31346,
-        "_raw-step-1": "31,346 to 57,627",
-        "step-2": 57627,
-        "_raw-step-2": "31,346 to 57,627",
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "A) November 7, 2022",
-        "step-1": 32443,
-        "_raw-step-1": "32,443 to 59,644",
-        "step-2": 59644,
-        "_raw-step-2": "32,443 to 59,644",
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "X) November 7, 2022 - Wage adjustment",
-        "step-1": 32849,
-        "_raw-step-1": "32,849 to 60,390",
-        "step-2": 60390,
-        "_raw-step-2": "32,849 to 60,390",
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "Y) September 28, 2023 – Conversion to CT-FIN-DEV",
-        "step-1": "",
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      }
-    ]
-  },
   "CT": {
     "annual-rates-of-pay": [
       {
@@ -3388,78 +3355,120 @@
   "AS-04": {
     "annual-rates-of-pay": [
       {
-        "effective-date": "$) June 21, 2020",
-        "step-1": 71599,
-        "step-2": 74319,
-        "step-3": 77368,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "A) June 21, 2021",
-        "step-1": 72673,
-        "step-2": 75434,
-        "step-3": 78529,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "W) June 21, 2022",
-        "step-1": 73196,
-        "step-2": 75977,
-        "step-3": 79094,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "B) November 7, 2022",
-        "step-1": 75758,
-        "step-2": 78636,
-        "step-3": 81862,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
         "effective-date": "X) November 7 2022 - Wage Adjustment",
         "step-1": 76705,
         "step-2": 79619,
         "step-3": 82885,
         "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
+      },
+      {
+        "effective-date": "X) June 21, 2022 - Wage Adjustment",
+        "step-1": 76157,
+        "step-2": 79050,
+        "step-3": 82294,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "C) June 21, 2023",
+        "step-1": 78442,
+        "step-2": 81422,
+        "step-3": 84763,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "Y) June 21, 2023 - Pay Line Adjustment",
+        "step-1": 78834,
+        "step-2": 81829,
+        "step-3": 85187,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "D) June 21, 2024",
+        "step-1": 80411,
+        "step-2": 83466,
+        "step-3": 86891,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "Z) June 21, 2024 - Wage Adjustment",
+        "step-1": 80612,
+        "step-2": 83675,
+        "step-3": 87108,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
       }
     ]
   },
   "AS-05": {
     "annual-rates-of-pay": [
       {
-        "effective-date": "$) June 21, 2020",
-        "step-1": 85476,
-        "step-2": 88724,
-        "step-3": 92412,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "A) June 21, 2021",
-        "step-1": 86758,
-        "step-2": 90055,
-        "step-3": 93798,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "W) June 21, 2022",
-        "step-1": 87383,
-        "step-2": 90703,
-        "step-3": 94473,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "B) November 7, 2022",
-        "step-1": 90441,
-        "step-2": 93878,
-        "step-3": 97780,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
         "effective-date": "X) November 7 2022 - Wage Adjustment",
         "step-1": 91572,
         "step-2": 95051,
         "step-3": 99002,
         "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
+      },
+      {
+        "effective-date": "$) June 21, 2020",
+        "step-1": 95209,
+        "step-2": 98828,
+        "step-3": 102712,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
+      },
+      {
+        "effective-date": "A) June 21, 2021",
+        "step-1": 96637,
+        "step-2": 100310,
+        "step-3": 104253,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
+      },
+      {
+        "effective-date": "X) June 21, 2022 - Wage Adjustment",
+        "step-1": 90917,
+        "step-2": 94372,
+        "step-3": 98295,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "C) June 21, 2023",
+        "step-1": 93645,
+        "step-2": 97203,
+        "step-3": 101244,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "Y) June 21, 2023 - Pay Line Adjustment",
+        "step-1": 94113,
+        "step-2": 97689,
+        "step-3": 101750,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "D) June 21, 2024",
+        "step-1": 95995,
+        "step-2": 99643,
+        "step-3": 103785,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "Z) June 21, 2024 - Wage Adjustment",
+        "step-1": 96235,
+        "step-2": 99892,
+        "step-3": 104044,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "$) June 21, 2020",
+        "step-1": 95209,
+        "step-2": 98828,
+        "step-3": 102712,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "A) June 21, 2021",
+        "step-1": 96637,
+        "step-2": 100310,
+        "step-3": 104253,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
       }
     ]
   },
@@ -3530,27 +3539,6 @@
   "AS-06": {
     "annual-rates-of-pay": [
       {
-        "effective-date": "$) June 21, 2020",
-        "step-1": 95209,
-        "step-2": 98828,
-        "step-3": 102712,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "A) June 21, 2021",
-        "step-1": 96637,
-        "step-2": 100310,
-        "step-3": 104253,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "W) June 21, 2022",
-        "step-1": 97333,
-        "step-2": 101032,
-        "step-3": 105004,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
         "effective-date": "B) November 7, 2022",
         "step-1": 100740,
         "step-2": 104568,
@@ -3563,6 +3551,45 @@
         "step-2": 105875,
         "step-3": 110037,
         "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
+      },
+      {
+        "effective-date": "$) June 21, 2020",
+        "step-1": 100220,
+        "step-2": 104033,
+        "step-3": 107980,
+        "step-4": 111226,
+        "step-5": 114592,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
+      },
+      {
+        "effective-date": "X) June 21, 2022 - Wage Adjustment",
+        "step-1": 101269,
+        "step-2": 105119,
+        "step-3": 109251,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "C) June 21, 2023",
+        "step-1": 104307,
+        "step-2": 108273,
+        "step-3": 112529,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "Y) June 21, 2023 - Pay Line Adjustment",
+        "step-1": 104829,
+        "step-2": 108814,
+        "step-3": 113092,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "$) June 21, 2020",
+        "step-1": 100220,
+        "step-2": 104033,
+        "step-3": 107980,
+        "step-4": 111226,
+        "step-5": 114592,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
       }
     ]
   },
@@ -3628,33 +3655,6 @@
   "AS-07": {
     "annual-rates-of-pay": [
       {
-        "effective-date": "$) June 21, 2020",
-        "step-1": 100220,
-        "step-2": 104033,
-        "step-3": 107980,
-        "step-4": 111226,
-        "step-5": 114592,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "A) June 21, 2021",
-        "step-1": 101723,
-        "step-2": 105593,
-        "step-3": 109600,
-        "step-4": 112894,
-        "step-5": 116311,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
-        "effective-date": "W) June 21, 2022",
-        "step-1": 102455,
-        "step-2": 106353,
-        "step-3": 110389,
-        "step-4": 113707,
-        "step-5": 117148,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
-      },
-      {
         "effective-date": "B) November 7, 2022",
         "step-1": 106041,
         "step-2": 110075,
@@ -3671,6 +3671,60 @@
         "step-4": 119158,
         "step-5": 122764,
         "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ct.html"
+      },
+      {
+        "effective-date": "B) June 21, 2022",
+        "step-1": 105283,
+        "step-2": 109289,
+        "step-3": 113436,
+        "step-4": 116845,
+        "step-5": 120382,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "X) June 21, 2022 - Wage Adjustment",
+        "step-1": 106599,
+        "step-2": 110655,
+        "step-3": 114854,
+        "step-4": 118306,
+        "step-5": 121887,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "C) June 21, 2023",
+        "step-1": 109797,
+        "step-2": 113975,
+        "step-3": 118300,
+        "step-4": 121855,
+        "step-5": 125544,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "Y) June 21, 2023 - Pay Line Adjustment",
+        "step-1": 110346,
+        "step-2": 114545,
+        "step-3": 118892,
+        "step-4": 122464,
+        "step-5": 126172,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "D) June 21, 2024",
+        "step-1": 112553,
+        "step-2": 116836,
+        "step-3": 121270,
+        "step-4": 124913,
+        "step-5": 128695,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
+      },
+      {
+        "effective-date": "Z) June 21, 2024 - Wage Adjustment",
+        "step-1": 112834,
+        "step-2": 117128,
+        "step-3": 121573,
+        "step-4": 125225,
+        "step-5": 129017,
+        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/pa.html"
       }
     ]
   },
@@ -22574,147 +22628,11 @@
       }
     ]
   },
-  "NU-PRA-01": {
-    "annual-rates-of-pay": [
-      {
-        "effective-date": "Z) Effective within one hundred and eighty (180) days from the date of signing – implementation of NU-PRA pay grid R) Effective within one hundred and eighty (180) days from the date of signing – the Nurse Practitioner (NP) allowance provided for under Appendix U will be deleted and rolled into the NU-PRA pay grid D) Effective October 1, 2025",
-        "step-1": 117800,
-        "step-2": 120101,
-        "step-3": 122383,
-        "step-4": 124695,
-        "step-5": 126984,
-        "step-6": 129281,
-        "step-7": 131567,
-        "step-8": 133863,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      },
-      {
-        "effective-date": "D) October 1, 2025",
-        "step-1": 120156,
-        "step-2": 122503,
-        "step-3": 124831,
-        "step-4": 127189,
-        "step-5": 129524,
-        "step-6": 131867,
-        "step-7": 134198,
-        "step-8": 136540,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      }
-    ]
+  "NU": {
+    "annual-rates-of-pay": []
   },
-  "NU-PRA-02": {
-    "annual-rates-of-pay": [
-      {
-        "effective-date": "NU-PRA-01: annual rates of pay (in dollars) Effective date Step 1 Step 2 Step 3 Step 4 Step 5 Step 6 Step 7 Step 8 Z) Within 180 days from the date of signing – implementation of NU-PRA pay grid 97,100 99,401 101,683 103,995 106,284 108,581 110,867 113,163 R) Within 180 days from the date of signing – roll-in of NP allowance 117,800 120,101 122,383 124,695 126,984 129,281 131,567 133,863 D) October 1, 2025 120,156 122,503 124,831 127,189 129,524 131,867 134,198 136,540",
-        "step-1": 118976,
-        "step-2": 121577,
-        "step-3": 124178,
-        "step-4": 126784,
-        "step-5": 129378,
-        "step-6": 131992,
-        "step-7": 134596,
-        "step-8": 137195,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      },
-      {
-        "effective-date": "D) October 1, 2025",
-        "step-1": 121356,
-        "step-2": 124009,
-        "step-3": 126662,
-        "step-4": 129320,
-        "step-5": 131966,
-        "step-6": 134632,
-        "step-7": 137288,
-        "step-8": 139939,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      }
-    ]
-  },
-  "NU-PRA-03": {
-    "annual-rates-of-pay": [
-      {
-        "effective-date": "NU-PRA-02: annual rates of pay (in dollars) Effective date Step 1 Step 2 Step 3 Step 4 Step 5 Step 6 Step 7 Step 8 Z) Within 180 days from the date of signing – implementation of NU-PRA pay grid 101,726 104,327 106,928 109,534 112,128 114,742 117,346 119,945 R) Within 180 days from the date of signing – roll-in of NP allowance 118,976 121,577 124,178 126,784 129,378 131,992 134,596 137,195 D) October 1, 2025 121,356 124,009 126,662 129,320 131,966 134,632 137,288 139,939",
-        "step-1": 121814,
-        "step-2": 124928,
-        "step-3": 128048,
-        "step-4": 131152,
-        "step-5": 134279,
-        "step-6": 137395,
-        "step-7": 140511,
-        "step-8": 143633,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      },
-      {
-        "effective-date": "D) October 1, 2025",
-        "step-1": 124250,
-        "step-2": 127427,
-        "step-3": 130609,
-        "step-4": 133775,
-        "step-5": 136965,
-        "step-6": 140143,
-        "step-7": 143321,
-        "step-8": 146506,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      }
-    ]
-  },
-  "NU-PRA-04": {
-    "annual-rates-of-pay": [
-      {
-        "effective-date": "NU-PRA-03: annual rates of pay (in dollars) Effective date Step 1 Step 2 Step 3 Step 4 Step 5 Step 6 Step 7 Step 8 Z) Within 180 days from the date of signing – implementation of NU-PRA pay grid 106,864 109,978 113,098 116,202 119,329 122,445 125,561 128,683 R) Within 180 days from the date of signing – roll-in of NP allowance 121,814 124,928 128,048 131,152 134,279 137,395 140,511 143,633 D) October 1, 2025 124,250 127,427 130,609 133,775 136,965 140,143 143,321 146,506",
-        "step-1": 130590,
-        "step-2": 134150,
-        "step-3": 137714,
-        "step-4": 141269,
-        "step-5": 144827,
-        "step-6": 148384,
-        "step-7": 151937,
-        "step-8": 155495,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      },
-      {
-        "effective-date": "D) October 1, 2025",
-        "step-1": 133202,
-        "step-2": 136833,
-        "step-3": 140468,
-        "step-4": 144094,
-        "step-5": 147724,
-        "step-6": 151352,
-        "step-7": 154976,
-        "step-8": 158605,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      }
-    ]
-  },
-  "NU-PRA-05": {
-    "annual-rates-of-pay": [
-      {
-        "effective-date": "NU-PRA-04: annual rates of pay (in dollars) Effective date Step 1 Step 2 Step 3 Step 4 Step 5 Step 6 Step 7 Step 8 Z) Within 180 days from the date of signing – implementation of NU-PRA pay grid 117,940 121,500 125,064 128,619 132,177 135,734 139,287 142,845 R) Within 180 days from the date of signing – roll-in of NP allowance 130,590 134,150 137,714 141,269 144,827 148,384 151,937 155,495 D) October 1, 2025 133,202 136,833 140,468 144,094 147,724 151,352 154,976 158,605",
-        "step-1": 132819,
-        "step-2": 136813,
-        "step-3": 140800,
-        "step-4": 144795,
-        "step-5": 148391,
-        "step-6": 152771,
-        "step-7": 156756,
-        "step-8": 160224,
-        "step-9": 163693,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      },
-      {
-        "effective-date": "D) October 1, 2025",
-        "step-1": 135475,
-        "step-2": 139549,
-        "step-3": 143616,
-        "step-4": 147691,
-        "step-5": 151359,
-        "step-6": 155826,
-        "step-7": 159891,
-        "step-8": 163428,
-        "step-9": 166967,
-        "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sh.html"
-      }
-    ]
+  "NP": {
+    "annual-rates-of-pay": []
   },
   "SO": {
     "annual-rates-of-pay": [
@@ -44855,6 +44773,9 @@
         "_source": "https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sv.html"
       }
     ]
+  },
+  "HS-PHS-07": {
+    "annual-rates-of-pay": []
   },
   "HS": {
     "annual-rates-of-pay": []
