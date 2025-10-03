@@ -100,16 +100,34 @@ export default function Admin() {
     setGroupStats([]);
 
     try {
+      console.info('[admin] Starting scraper request...');
+      
       const response = await fetch('/api/scraper', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        // Set a longer timeout for the scraper (5 minutes)
+        signal: AbortSignal.timeout(300000), // 5 minutes
       });
 
-      const data: ScraperResponse = await response.json();
+      console.info('[admin] Scraper response received, status:', response.status);
 
-      if (response.ok) {
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[admin] HTTP error:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data: ScraperResponse = await response.json();
+      console.info('[admin] Scraper data parsed:', {
+        success: data.success,
+        processedClassifications: data.processedClassifications,
+        newClassifications: data.newClassifications,
+        persistedTotal: data.persistedTotal
+      });
+
+      if (data.success !== false) {
         setResult(data);
         setLastUpdated(data.updatedAt ?? null);
         setPersistedTotal(
@@ -131,10 +149,22 @@ export default function Admin() {
           console.table(summary.map(({ group, total }) => ({ group, total })));
         }
       } else {
-        setError(data.error || data.details || data.message || 'Unknown error occurred');
+        throw new Error(data.error || data.details || data.message || 'Scraper returned unsuccessful status');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Network error');
+      console.error('[admin] Scraper error:', err);
+      
+      if (err instanceof Error) {
+        if (err.name === 'AbortError' || err.message.includes('timeout')) {
+          setError('Scraper timeout: The operation took longer than expected. This may be due to network issues or server overload. Please try again later.');
+        } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          setError('Network error: Unable to connect to the scraper API. Please check that the development server is running and try again.');
+        } else {
+          setError(`Scraper error: ${err.message}`);
+        }
+      } else {
+        setError('Unknown error occurred during scraping');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -52,10 +52,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     console.log("[scraper] Starting canonical scraper run");
+    console.log(`[scraper] Processing ${URLS.length} Treasury Board URLs`);
 
     const scraped = await scrapeAll(URLS);
     const processedCount = Object.keys(scraped).length;
-    console.log(`[scraper] Parsed ${processedCount} classifications from source pages`);
+    console.log(`[scraper] Successfully parsed ${processedCount} classifications from source pages`);
+
+    if (processedCount === 0) {
+      console.warn("[scraper] WARNING: No classifications were found. This might indicate a problem with the source URLs or parsing logic.");
+    }
 
     const dataPath = path.join(process.cwd(), "data", "data.json");
 
@@ -63,8 +68,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const raw = await fs.readFile(dataPath, "utf8");
       existingData = raw ? (JSON.parse(raw) as SalaryData) : {};
+      console.log(`[scraper] Loaded ${Object.keys(existingData).length} existing classifications from data.json`);
     } catch (readError) {
-      console.warn("[scraper] Existing data could not be read. A new data.json will be created.");
+      console.warn("[scraper] Existing data could not be read. A new data.json will be created.", readError);
       existingData = {};
     }
 
@@ -92,14 +98,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       newCodes,
       persistedTotal,
       updatedAt,
+      urlsProcessed: URLS.length,
       data: scraped,
       groupSummary,
     });
   } catch (error) {
-    console.error("[scraper] Scraper error", error);
+    console.error("[scraper] Scraper error:", error);
+    
+    // Provide more detailed error information
+    const errorDetails = {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : "UnknownError"
+    };
+    
     return res.status(500).json({
+      success: false,
       error: "Scraping failed",
-      details: error instanceof Error ? error.message : "Unknown error",
+      details: errorDetails.message,
+      debug: process.env.NODE_ENV === 'development' ? errorDetails : undefined,
+      timestamp: new Date().toISOString()
     });
   }
 }

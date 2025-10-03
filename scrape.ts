@@ -489,13 +489,38 @@ function sortSteps(entry: RatesEntry): RatesEntry {
 
 async function fetchPage(url: string): Promise<string> {
   log(`Fetching: ${url}`);
-  const r = await fetch(url, {
-    headers: { "User-Agent": "VAC scraper (respectful fetch)" },
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
-  const html = await r.text();
-  await sleep(POLITE_DELAY_MS);
-  return html;
+  try {
+    const r = await fetch(url, {
+      headers: { 
+        "User-Agent": "VAC scraper (respectful fetch)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1"
+      },
+    });
+    
+    if (!r.ok) {
+      const errorText = await r.text();
+      log(`HTTP ${r.status} for ${url}. Response: ${errorText.substring(0, 200)}...`);
+      throw new Error(`HTTP ${r.status} for ${url}`);
+    }
+    
+    const html = await r.text();
+    
+    // Check if we got an error page instead of content
+    if (html.includes("An error occurred") || html.includes("Page not found") || html.includes("404") || html.length < 1000) {
+      log(`Warning: ${url} returned suspicious content (length: ${html.length})`);
+      log(`Content preview: ${html.substring(0, 500)}...`);
+    }
+    
+    await sleep(POLITE_DELAY_MS);
+    return html;
+  } catch (error) {
+    log(`Failed to fetch ${url}: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
 }
 
 
@@ -614,18 +639,38 @@ function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
 async function scrapeAll(urls: string[]): Promise<SalaryData> {
   const result: SalaryData = {};
   let ok = 0;
+  const failed: string[] = [];
+  
   for (const url of urls) {
     try {
+      log(`Processing ${urls.indexOf(url) + 1}/${urls.length}: ${url}`);
       const pageData = await scrapeAppendixAFromPage(url);
-      mergeData(result, pageData);
-      ok++;
+      const classificationCount = Object.keys(pageData).length;
+      
+      if (classificationCount > 0) {
+        mergeData(result, pageData);
+        log(`✓ Success: ${url} -> ${classificationCount} classifications`);
+        ok++;
+      } else {
+        log(`⚠ Warning: ${url} -> No classifications found`);
+        failed.push(url);
+      }
     } catch (e: unknown) {
-      log(`FAIL ${url} -> ${(e as Error).message}`);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      log(`✗ FAIL: ${url} -> ${errorMsg}`);
+      failed.push(url);
     }
   }
-  log(
-    `Parsed ${ok} of ${urls.length} pages. Classifications: ${Object.keys(result).length}.`,
-  );
+  
+  log(`\n=== SCRAPING SUMMARY ===`);
+  log(`Successful: ${ok}/${urls.length} pages`);
+  log(`Total classifications found: ${Object.keys(result).length}`);
+  
+  if (failed.length > 0) {
+    log(`\nFailed URLs (${failed.length}):`);
+    failed.forEach(url => log(`  - ${url}`));
+  }
+  
   return result;
 }
 
