@@ -230,7 +230,64 @@ const extractEffectiveDate = (text: string) => {
   return matches[matches.length - 1][1];
 };
 
-function tableToRatesBlocks($: any, $table: any, sourceUrl?: string): RatesEntry[] {
+function parseClassificationLegend($: any, contentNodes: any[]): Record<string, string> {
+  const legendMap: Record<string, string> = {};
+  
+  // Look through all content nodes for legend entries
+  for (const node of contentNodes) {
+    const $node = $(node);
+    const text = $node.text();
+    
+    // Check if this node or its children contain "Table legend" or "legend"
+    const hasLegendHeading = text.toLowerCase().includes('table legend') || 
+                            text.toLowerCase().includes('legend') ||
+                            $node.find('*').filter((_i: any, el: any) => {
+                              return $(el).text().toLowerCase().includes('legend');
+                            }).length > 0;
+    
+    if (hasLegendHeading) {
+      // Parse legend entries from this node and following nodes
+      let currentNode = $node;
+      let searchNodes = [$node];
+      
+      // Also check the next few sibling nodes for legend entries
+      let nextSibling = $node.next();
+      let count = 0;
+      while (nextSibling.length && count < 10) { // Limit search to avoid going too far
+        searchNodes.push(nextSibling);
+        nextSibling = nextSibling.next();
+        count++;
+      }
+      
+      for (const $searchNode of searchNodes) {
+        const nodeText = $searchNode.text();
+        
+        // Parse legend entries like "$) Effective June 21, 2020" or "A) Effective June 21, 2021"
+        const legendEntries = nodeText.match(/([A-Z$])\)\s*Effective\s+([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})[^\n\r]*/g);
+        
+        if (legendEntries) {
+          legendEntries.forEach((entry: string) => {
+            const match = entry.match(/([A-Z$])\)\s*Effective\s+([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})/);
+            if (match) {
+              const symbol = match[1];
+              const date = match[2].replace(/,(\s+\d{4})/, '$1'); // Clean up comma formatting
+              legendMap[symbol] = date;
+            }
+          });
+        }
+      }
+      
+      // If we found legend entries, break out of the loop
+      if (Object.keys(legendMap).length > 0) {
+        break;
+      }
+    }
+  }
+  
+  return legendMap;
+}
+
+function tableToRatesBlocks($: any, $table: any, sourceUrl?: string, legendMap: Record<string, string> = {}): RatesEntry[] {
   const caption = clean($table.find("caption").first().text());
   const pageOrPrevText = clean($table.prev().text());
   const captionOrPrevEff =
@@ -266,6 +323,58 @@ function tableToRatesBlocks($: any, $table: any, sourceUrl?: string): RatesEntry
 
   const out: RatesEntry[] = [];
 
+  // NEW APPROACH: If we have legend mappings and headers that look like symbols,
+  // create one entry per effective date with all salary steps
+  if (Object.keys(legendMap).length > 0) {
+    // Check if headers contain legend symbols
+    const symbolHeaders = headers.filter((h, i) => i > 0 && legendMap[clean(h)]);
+    
+    if (symbolHeaders.length > 0) {
+      // Process each symbol/effective date
+      symbolHeaders.forEach((header, headerIdx) => {
+        const symbol = clean(header);
+        const effectiveDate = legendMap[symbol];
+        
+        if (!effectiveDate) return;
+        
+        const entry: RatesEntry = { "effective-date": effectiveDate } as RatesEntry;
+        if (sourceUrl) entry["_source"] = sourceUrl;
+        
+        // For each row, get the salary value from this column
+        let stepNum = 1;
+        rows.forEach((row, rowIdx) => {
+          const columnIdx = headerIdx + 1; // +1 because we filtered out first column
+          const cellValue = clean(row[columnIdx] ?? "");
+          
+          if (cellValue) {
+            // Check if it's a range
+            const range = parseRange(cellValue);
+            if (range && range.length === 2) {
+              entry[`step-${stepNum}`] = range[0];
+              entry[`_raw-step-${stepNum}`] = cellValue;
+              entry[`step-${stepNum + 1}`] = range[1];
+              entry[`_raw-step-${stepNum + 1}`] = cellValue;
+              stepNum += 2;
+            } else {
+              const v = parseMoney(cellValue);
+              if (!Number.isNaN(v)) {
+                entry[`step-${stepNum}`] = v;
+                stepNum++;
+              }
+            }
+          }
+        });
+        
+        if (Object.keys(entry).some((k) => /^step-\d+$/.test(k))) {
+          out.push(entry);
+        }
+      });
+      
+      return out;
+    }
+  }
+
+  // FALLBACK: Original logic for non-legend tables
   // For each data row, try to extract an effective date from the first cell
   for (const row of rows) {
     const rowFirst = clean(row[0] ?? "");
@@ -556,6 +665,10 @@ function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
     }
 
     const nodes = collectUntilNextHeading($, $start);
+    
+    // Parse legend mappings from all collected nodes
+    const legendMap = parseClassificationLegend($, nodes);
+    
     for (const n of nodes) {
       const $n = $(n);
       $n.find("table")
@@ -593,7 +706,7 @@ function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
 
       if (!result[useClass]) result[useClass] = { "annual-rates-of-pay": [] };
 
-  const blocks = tableToRatesBlocks($, $t, sourceUrl);
+      const blocks = tableToRatesBlocks($, $t, sourceUrl, legendMap);
       for (const block of blocks) {
         const m = (fromCaption ?? useClass).match(
           /^([A-Z]{1,4})(?:-(\d{1,3}))?$/,
