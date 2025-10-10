@@ -10,7 +10,8 @@ A modern, fast, and user-friendly web application for exploring Canadian public 
 
 - **🔍 Comprehensive Search**: Browse all Canadian public service classifications
 - **💰 Salary Data**: Real-time salary information with step progression
-- **🎯 Equivalency Tool**: Compare salary equivalencies across classifications  
+- **🎯 Equivalency Tool**: Compare salary equivalencies across classifications
+- **🔄 Deployment Eligibility**: Check deployment eligibility using Treasury Board inter-step increment rules
 - **🌙 Dark/Light Mode**: Elegant theme switching with custom Sun/Moon icons
 - **📱 Responsive Design**: Optimized for all devices with HeroUI components
 - **⚡ High Performance**: ~8s build time with advanced caching
@@ -45,17 +46,20 @@ Visit `http://localhost:3000` to see the application.
 ## 🚀 Deployment
 
 ### Vercel (Recommended)
+
 1. **Connect to Vercel**: Link your GitHub repository to Vercel
 2. **Automatic Deploy**: Push to main branch triggers deployment
 3. **Zero Config**: Uses included `vercel.json` configuration
 
 Manual deployment:
+
 ```bash
 npm i -g vercel
 vercel
 ```
 
 ### Custom Deployment
+
 ```bash
 # Build for production
 npm run build
@@ -67,17 +71,20 @@ npm start
 ## 📡 API Endpoints
 
 ### Core Endpoints
+
 - `GET /api/data` - Complete salary dataset
 - `GET /api/top` - Top salaries by classification
 - `GET /api/scraper` - Data refresh (admin)
 
 ### Classification-Specific
+
 - `GET /api/[code]` - Full classification data (e.g., `/api/cs-01`)
 - `GET /api/[code]/current` - Current salary steps
 - `GET /api/[code]/top` - Top salary for classification
 - `GET /api/[code]/[step]` - Specific step salary
 
 ### Example Usage
+
 ```bash
 # Get all data
 curl https://your-app.vercel.app/api/data
@@ -92,6 +99,7 @@ curl https://your-app.vercel.app/api/as-04/top
 ## 🎨 UI Components
 
 ### Custom Icon System
+
 ```tsx
 import { Sun, Moon, Upload, Globe, History, Send, X } from './components/Icons';
 
@@ -101,7 +109,9 @@ import { Sun, Moon, Upload, Globe, History, Send, X } from './components/Icons';
 ```
 
 ### Theme Toggle
+
 Beautiful theme switching with custom icons:
+
 ```tsx
 import { ThemeToggle } from './components/ThemeToggle';
 // Includes smooth transitions and proper SSR handling
@@ -118,17 +128,20 @@ import { ThemeToggle } from './components/ThemeToggle';
 ## 🔧 Configuration
 
 ### Included Configuration Files
+
 - `vercel.json` - Deployment configuration with caching headers
 - `.vercelignore` - Optimized build exclusions
 - `next.config.js` - Build optimizations and SWC compiler
 - `tailwind.config.ts` - Custom design system
 
 ### Environment Variables
+
 No environment variables required - works out of the box!
 
 ## 📊 Available Classifications
 
 The API includes 107+ public service classifications including:
+
 - **Administrative**: AS, CR, PM, etc.
 - **Technical**: CS, IT, EN, etc.
 - **Specialized**: MD, EX, EC, etc.

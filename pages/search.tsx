@@ -1,32 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import NextLink from 'next/link'
+import Head from 'next/head'
+import {
+  Autocomplete,
+  AutocompleteItem,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  Divider,
+  Input,
+  Spinner,
+} from '@heroui/react'
 
 interface SalaryData {
   [key: string]: {
     'annual-rates-of-pay': Array<{
-      'effective-date': string;
-      [stepKey: string]: string | number;
-    }>;
-  };
+      'effective-date': string | null
+      [stepKey: string]: string | number | null | undefined
+    }>
+  }
 }
 
 interface TopSalaries {
-  [key: string]: number;
+  [key: string]: number
 }
 
-export default function Search() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedClassification, setSelectedClassification] = useState('');
-  const [minTopSalary, setMinTopSalary] = useState<number | ''>('');
-  const [maxTopSalary, setMaxTopSalary] = useState<number | ''>('');
-  const [minSteps, setMinSteps] = useState<number | ''>('');
-  const [maxSteps, setMaxSteps] = useState<number | ''>('');
-  const [salaryData, setSalaryData] = useState<SalaryData | null>(null);
-  const [topSalaries, setTopSalaries] = useState<TopSalaries | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+interface SalaryInfo {
+  effectiveDate: string | null
+  stepCount: number
+  minSalary: number
+  maxSalary: number
+}
+
+export default function SearchPage() {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedClassification, setSelectedClassification] = useState<string | null>(null)
+  const [minTopSalary, setMinTopSalary] = useState('')
+  const [maxTopSalary, setMaxTopSalary] = useState('')
+  const [minSteps, setMinSteps] = useState('')
+  const [maxSteps, setMaxSteps] = useState('')
+  const [salaryData, setSalaryData] = useState<SalaryData | null>(null)
+  const [topSalaries, setTopSalaries] = useState<TopSalaries | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const classifications = [
     'AC', 'AG', 'AI', 'AR', 'AS', 'AU', 'BI', 'CAI', 'CH', 'CM', 'CO', 'CR', 'CS', 'CX',
@@ -36,448 +54,447 @@ export default function Search() {
     'OE-MSE', 'OM', 'PC', 'PE', 'PG', 'PH', 'PI', 'PM', 'PO-IMA', 'PO-TCO', 'PRS', 'PS',
     'PY', 'RO', 'SE-REM', 'SE-RES', 'SG-PAT', 'SG-SRE', 'SO-INS', 'ST-COR', 'ST-OCE',
     'ST-SCY', 'ST-STN', 'ST-TYP', 'SW-CHA', 'SW-SCW', 'TI', 'TR', 'UT', 'VM', 'WP'
-  ];
+  ]
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const { cachedFetch } = await import('../lib/api-cache')
         const [dataResponse, topResponse] = await Promise.all([
-          fetch('/api/data'),
-          fetch('/api/top')
-        ]);
+          cachedFetch('/api/data', undefined, 60),
+          cachedFetch('/api/top', undefined, 60)
+        ])
 
-        if (!dataResponse.ok || !topResponse.ok) {
-          throw new Error('Failed to fetch data');
-        }
+        // The API returns { top: {...}, popular: [...] }
+        const topData = topResponse?.top || {}
 
-        const dataResult = await dataResponse.json();
-        const topResult = await topResponse.json();
-
-        setSalaryData(dataResult);
-        setTopSalaries(topResult);
+        setSalaryData(dataResponse)
+        setTopSalaries(topData)
 
         // Check for searchTerm in URL params
-        const urlParams = new URLSearchParams(window.location.search);
-        const searchTermParam = urlParams.get('searchTerm');
+        const urlParams = new URLSearchParams(window.location.search)
+        const searchTermParam = urlParams.get('searchTerm')
         if (searchTermParam) {
-          setSearchTerm(searchTermParam);
+          setSearchTerm(searchTermParam)
         }
       } catch (err) {
-        setError('Failed to load salary data');
-        console.error(err);
+        console.error(err)
+        setError('Unable to load salary data. Please try again later.')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-
-    fetchData();
-  }, []);
-
-  const filteredClassifications = classifications.filter(classification =>
-    classification.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const getSuggestions = () => {
-    if (!searchTerm || !salaryData) return [];
-
-    const allCodes = Object.keys(salaryData);
-    return allCodes
-      .filter(code => code.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort();
-  };
-
-  const suggestions = getSuggestions();
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setSearchTerm(suggestion);
-    setShowSuggestions(false);
-    setSelectedSuggestionIndex(-1);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showSuggestions || suggestions.length === 0) return;
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedSuggestionIndex(prev => 
-          prev < suggestions.length - 1 ? prev + 1 : 0
-        );
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedSuggestionIndex(prev => 
-          prev > 0 ? prev - 1 : suggestions.length - 1
-        );
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (selectedSuggestionIndex >= 0) {
-          handleSuggestionClick(suggestions[selectedSuggestionIndex]);
-        }
-        break;
-      case 'Escape':
-        setShowSuggestions(false);
-        setSelectedSuggestionIndex(-1);
-        break;
-    }
-  };
-
-  const getFilteredSalaryData = () => {
-    if (!salaryData) return [];
-
-    let filtered = Object.keys(salaryData);
-
-    if (searchTerm) {
-      filtered = filtered.filter(key =>
-        key.toLowerCase().includes(searchTerm.toLowerCase())
-      );
     }
 
-    if (selectedClassification) {
-      filtered = filtered.filter(key =>
-        key.startsWith(selectedClassification.toUpperCase())
-      );
-    }
+    fetchData()
+  }, [])
 
-
-    // Filter by number of steps (min/max)
-    if (minSteps !== '') {
-      filtered = filtered.filter((key) => {
-        const info = getMostRecentSalaryInfo(key);
-        return info && typeof info.stepCount === 'number' && info.stepCount >= Number(minSteps);
-      });
-    }
-    if (maxSteps !== '') {
-      filtered = filtered.filter((key) => {
-        const info = getMostRecentSalaryInfo(key);
-        return info && typeof info.stepCount === 'number' && info.stepCount <= Number(maxSteps);
-      });
-    }
-
-    // Filter by min/max top salary using topSalaries
-    if (minTopSalary !== '' && topSalaries) {
-      filtered = filtered.filter((key) => {
-        const v = topSalaries[key];
-        return typeof v === 'number' && !isNaN(v) && v >= Number(minTopSalary);
-      });
-    }
-    if (maxTopSalary !== '' && topSalaries) {
-      filtered = filtered.filter((key) => {
-        const v = topSalaries[key];
-        return typeof v === 'number' && !isNaN(v) && v <= Number(maxTopSalary);
-      });
-    }
-
-    // Filter by minimum number of steps using parsed data
-    if (minSteps !== '') {
-      filtered = filtered.filter((key) => {
-        const info = getMostRecentSalaryInfo(key);
-        return info && typeof info.stepCount === 'number' && info.stepCount >= Number(minSteps);
-      });
-    }
-
-    return filtered.sort();
-  };
-
-  const formatSalary = (amount: number) => {
+  const formatSalary = useCallback((amount: number) => {
     return new Intl.NumberFormat('en-CA', {
       style: 'currency',
       currency: 'CAD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(amount);
-  };
+    }).format(amount)
+  }, [])
 
-  const getMostRecentSalaryInfo = (code: string) => {
-    if (!salaryData || !salaryData[code]) return null;
+  const getMostRecentSalaryInfo = useCallback((code: string): SalaryInfo | null => {
+    if (!salaryData || !salaryData[code]) return null
 
-    const rates = salaryData[code]['annual-rates-of-pay'];
-    if (!rates || rates.length === 0) return null;
+    const rates = salaryData[code]['annual-rates-of-pay']
+    if (!rates || rates.length === 0) return null
 
-    const mostRecent = rates[rates.length - 1];
-    const steps = Object.keys(mostRecent).filter(key => key.startsWith('step-'));
-    const stepCount = steps.length;
-    const minSalary = mostRecent[steps[0]];
-    const maxSalary = mostRecent[steps[steps.length - 1]];
+    const mostRecent = rates[rates.length - 1]
+    const stepKeys = Object.keys(mostRecent)
+      .filter(key => key.startsWith('step-'))
+      .sort((a, b) => Number(a.split('-')[1]) - Number(b.split('-')[1]))
+
+    if (stepKeys.length === 0) return null
+
+    const minSalary = mostRecent[stepKeys[0]]
+    const maxSalary = mostRecent[stepKeys[stepKeys.length - 1]]
 
     return {
       effectiveDate: mostRecent['effective-date'],
-      stepCount,
-      minSalary: typeof minSalary === 'number' ? minSalary : parseInt(minSalary as string),
-      maxSalary: typeof maxSalary === 'number' ? maxSalary : parseInt(maxSalary as string),
-    };
-  };
+      stepCount: stepKeys.length,
+      minSalary: typeof minSalary === 'number' ? minSalary : Number(minSalary) || 0,
+      maxSalary: typeof maxSalary === 'number' ? maxSalary : Number(maxSalary) || 0,
+    }
+  }, [salaryData])
+
+  const filteredSalaryData = useMemo(() => {
+    if (!salaryData) return []
+
+    let filtered = Object.keys(salaryData)
+
+    if (searchTerm) {
+      filtered = filtered.filter(key =>
+        key.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    if (selectedClassification) {
+      filtered = filtered.filter(key =>
+        key.startsWith(selectedClassification.toUpperCase())
+      )
+    }
+
+    if (minSteps !== '') {
+      filtered = filtered.filter(key => {
+        const info = getMostRecentSalaryInfo(key)
+        return info && info.stepCount >= Number(minSteps)
+      })
+    }
+
+    if (maxSteps !== '') {
+      filtered = filtered.filter(key => {
+        const info = getMostRecentSalaryInfo(key)
+        return info && info.stepCount <= Number(maxSteps)
+      })
+    }
+
+    if (minTopSalary !== '' && topSalaries) {
+      filtered = filtered.filter(key => {
+        const v = topSalaries[key]
+        return typeof v === 'number' && !isNaN(v) && v >= Number(minTopSalary)
+      })
+    }
+
+    if (maxTopSalary !== '' && topSalaries) {
+      filtered = filtered.filter(key => {
+        const v = topSalaries[key]
+        return typeof v === 'number' && !isNaN(v) && v <= Number(maxTopSalary)
+      })
+    }
+
+    return filtered.sort()
+  }, [salaryData, searchTerm, selectedClassification, minSteps, maxSteps, minTopSalary, maxTopSalary, topSalaries, getMostRecentSalaryInfo])
+
+  const filteredStats = useMemo(() => {
+    if (filteredSalaryData.length === 0 || !topSalaries) return null
+
+    const validSalaries = filteredSalaryData
+      .map(code => topSalaries[code])
+      .filter(val => typeof val === 'number' && !isNaN(val) && val > 0)
+
+    if (validSalaries.length === 0) return null
+
+    return {
+      total: filteredSalaryData.length,
+      highest: Math.max(...validSalaries),
+      lowest: Math.min(...validSalaries),
+      average: Math.round(validSalaries.reduce((a, b) => a + b, 0) / validSalaries.length)
+    }
+  }, [filteredSalaryData, topSalaries])
+
+  const allCodes = useMemo(
+    () => (salaryData ? Object.keys(salaryData).sort() : []),
+    [salaryData]
+  )
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading salary data...</div>
-      </div>
-    );
+      <>
+        <Head>
+          <title>Advanced Search - PS Salary Data</title>
+        </Head>
+        <div className="flex h-96 items-center justify-center">
+          <Spinner size="lg" label="Loading salary data..." />
+        </div>
+      </>
+    )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl text-red-600">{error}</div>
-      </div>
-    );
+      <>
+        <Head>
+          <title>Advanced Search - PS Salary Data</title>
+        </Head>
+        <Card className="border border-danger bg-danger-50">
+          <CardBody>
+            <p className="text-danger">{ error }</p>
+          </CardBody>
+        </Card>
+      </>
+    )
   }
 
-  const filteredSalaryData = getFilteredSalaryData();
-
-  // Calculate stats from filtered data instead of all data
-  const filteredStats = filteredSalaryData.length > 0 && topSalaries ? {
-    total: filteredSalaryData.length,
-    highest: Math.max(...filteredSalaryData.map(code => topSalaries[code]).filter(val => !isNaN(val) && val > 0)),
-    lowest: Math.min(...filteredSalaryData.map(code => topSalaries[code]).filter(val => !isNaN(val) && val > 0)),
-    average: Math.round(filteredSalaryData.map(code => topSalaries[code]).filter(val => !isNaN(val) && val > 0).reduce((a, b) => a + b, 0) / filteredSalaryData.map(code => topSalaries[code]).filter(val => !isNaN(val) && val > 0).length)
-  } : null;
-
   return (
-    <main className="min-h-screen p-8 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <Link href="/" className="text-blue-500 hover:underline mb-4 inline-block">
-            ← Back to API Documentation
-          </Link>
-          <h1 className="text-3xl font-bold mb-4">Public Servant Salary Search</h1>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Search and explore salary data for Canadian public service classifications
-          </p>
-        </div>
+    <>
+      <Head>
+        <title>Advanced Search - PS Salary Data</title>
+        <meta
+          name="description"
+          content="Search and filter Canadian public service salary data by classification, salary range, and number of steps."
+        />
+      </Head>
 
-        {/* Search and Filter Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div className="relative">
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Search Classifications
-              </label>
-              <input
-                id="search"
-                type="text"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setShowSuggestions(e.target.value.length > 0);
-                  setSelectedSuggestionIndex(-1);
-                }}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setShowSuggestions(searchTerm.length > 0)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+      <div className="space-y-10">
+        {/* Header Card */ }
+        <Card className="border border-content3/40 bg-content1/80">
+          <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-2">
+              <Chip color="primary" variant="flat" radius="sm" className="uppercase tracking-wide">
+                Advanced Search
+              </Chip>
+              <h1 className="text-3xl font-semibold text-foreground">
+                Search Canadian public service salaries
+              </h1>
+              <p className="max-w-2xl text-sm text-default-500">
+                Filter and explore salary data across 107+ classifications with advanced criteria including
+                salary ranges, step counts, and classification families.
+              </p>
+            </div>
+            <Button as={ NextLink } href="/" variant="bordered" size="sm">
+              Back to Home
+            </Button>
+          </CardHeader>
+        </Card>
+
+        {/* Search and Filter Card */ }
+        <Card className="border border-content3/40 bg-content1/80">
+          <CardBody className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Search Classifications"
                 placeholder="e.g., CS-01, AS, PM..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoComplete="off"
+                variant="bordered"
+                size="lg"
+                value={ searchTerm }
+                onValueChange={ setSearchTerm }
+                isClearable
+                classNames={ {
+                  base: 'w-full',
+                } }
               />
 
-              {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto">
-                  {suggestions.map((suggestion, index) => {
-                    const salaryInfo = getMostRecentSalaryInfo(suggestion);
-                    const topSalary = topSalaries?.[suggestion];
-
-                    return (
-                      <div
-                        key={suggestion}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className={`px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0 ${
-                          index === selectedSuggestionIndex ? 'bg-blue-50 dark:bg-blue-900 ring-1 ring-blue-200 dark:ring-blue-700' : ''
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-blue-600 dark:text-blue-400">{suggestion}</span>
-                          {topSalary && (
-                            <span className="text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                              {formatSalary(topSalary)}
-                            </span>
-                          )}
-                        </div>
-                        {salaryInfo && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            <div className="flex justify-between">
-                              <span>Range: {formatSalary(salaryInfo.minSalary)} - {formatSalary(salaryInfo.maxSalary)}</span>
-                              <span>{salaryInfo.stepCount} steps</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <Autocomplete
+                label="Classification Family"
+                placeholder="Select classification family"
+                variant="bordered"
+                size="lg"
+                selectedKey={ selectedClassification }
+                onSelectionChange={ (key) => setSelectedClassification(key as string) }
+                classNames={ {
+                  base: 'w-full',
+                } }
+              >
+                <AutocompleteItem key="" value="">
+                  All Classifications
+                </AutocompleteItem>
+                { classifications.map(classification => (
+                  <AutocompleteItem key={ classification } value={ classification }>
+                    { classification }
+                  </AutocompleteItem>
+                )) }
+              </Autocomplete>
             </div>
-            <div>
-              <label htmlFor="classification" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Filter by Classification
-              </label>
-              <input
-                id="classification"
-                type="text"
-                value={selectedClassification}
-                onChange={(e) => setSelectedClassification(e.target.value.toUpperCase())}
-                placeholder="Type or select classification..."
-                list="classifications-list"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <datalist id="classifications-list">
-                <option value="">All Classifications</option>
-                {classifications.map(classification => (
-                  <option key={classification} value={classification}>
-                    {classification}
-                  </option>
-                ))}
-              </datalist>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Min Top Salary (CAD)</label>
-              <input
-                type="number"
-                min={0}
-                value={minTopSalary === '' ? '' : String(minTopSalary)}
-                onChange={(e) => setMinTopSalary(e.target.value === '' ? '' : Number(e.target.value))}
+            <Divider />
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Input
+                label="Min Top Salary (CAD)"
                 placeholder="e.g., 60000"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Top Salary (CAD)</label>
-              <input
+                variant="bordered"
                 type="number"
-                min={0}
-                value={maxTopSalary === '' ? '' : String(maxTopSalary)}
-                onChange={(e) => setMaxTopSalary(e.target.value === '' ? '' : Number(e.target.value))}
+                value={ minTopSalary }
+                onValueChange={ setMinTopSalary }
+                startContent={
+                  <span className="text-default-400 text-small">$</span>
+                }
+              />
+
+              <Input
+                label="Max Top Salary (CAD)"
                 placeholder="e.g., 120000"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Min Steps</label>
-              <input
+                variant="bordered"
                 type="number"
-                min={0}
-                value={minSteps === '' ? '' : String(minSteps)}
-                onChange={(e) => setMinSteps(e.target.value === '' ? '' : Number(e.target.value))}
+                value={ maxTopSalary }
+                onValueChange={ setMaxTopSalary }
+                startContent={
+                  <span className="text-default-400 text-small">$</span>
+                }
+              />
+
+              <Input
+                label="Min Steps"
                 placeholder="e.g., 5"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Steps</label>
-              <input
+                variant="bordered"
                 type="number"
-                min={0}
-                value={maxSteps === '' ? '' : String(maxSteps)}
-                onChange={(e) => setMaxSteps(e.target.value === '' ? '' : Number(e.target.value))}
+                value={ minSteps }
+                onValueChange={ setMinSteps }
+              />
+
+              <Input
+                label="Max Steps"
                 placeholder="e.g., 10"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none"
+                variant="bordered"
+                type="number"
+                value={ maxSteps }
+                onValueChange={ setMaxSteps }
               />
             </div>
-          </div>
 
-          <div className="text-sm text-gray-600 dark:text-gray-300">
-            Showing {filteredSalaryData.length} results
-          </div>
-        </div>
-
-        {/* Results Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSalaryData.map((code) => {
-            const salaryInfo = getMostRecentSalaryInfo(code);
-            const topSalary = topSalaries?.[code];
-
-            return (
-              <div key={code} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-xl font-semibold text-blue-600 dark:text-blue-400">{code}</h3>
-                  {topSalary && (
-                    <span className="bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 text-xs px-2 py-1 rounded-full">
-                      Top: {formatSalary(topSalary)}
-                    </span>
-                  )}
-                </div>
-
-                {salaryInfo && (
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="font-medium">Range:</span> {formatSalary(salaryInfo.minSalary)} - {formatSalary(salaryInfo.maxSalary)}
-                    </div>
-                    <div>
-                      <span className="font-medium">Steps:</span> {salaryInfo.stepCount}
-                    </div>
-                    <div className="text-gray-600 dark:text-gray-400">
-                      <span className="font-medium">Effective:</span> {salaryInfo.effectiveDate}
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-4 flex gap-2">
-                  <Link
-                    href={`/api/${code.toLowerCase()}`}
-                    className="text-blue-500 hover:underline text-sm"
-                    target="_blank"
-                  >
-                    View Full Data
-                  </Link>
-                  <Link
-                    href={`/api/${code.toLowerCase()}/current`}
-                    className="text-blue-500 hover:underline text-sm"
-                    target="_blank"
-                  >
-                    Current Steps
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {filteredSalaryData.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-xl text-gray-500 dark:text-gray-400 mb-4">No results found</div>
-            <div className="text-gray-400 dark:text-gray-500">
-              Try adjusting your search terms or filters
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-default-500">
+                Showing <span className="font-semibold text-foreground">{ filteredSalaryData.length }</span> results
+              </p>
+              { (searchTerm || selectedClassification || minTopSalary || maxTopSalary || minSteps || maxSteps) && (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="default"
+                  onPress={ () => {
+                    setSearchTerm('')
+                    setSelectedClassification(null)
+                    setMinTopSalary('')
+                    setMaxTopSalary('')
+                    setMinSteps('')
+                    setMaxSteps('')
+                  } }
+                >
+                  Clear Filters
+                </Button>
+              ) }
             </div>
-          </div>
-        )}
+          </CardBody>
+        </Card>
 
-        {/* Statistics Section */}
-        {filteredStats && (
-          <div className="mt-12 bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
-            <h2 className="text-2xl font-bold mb-4 dark:text-white">Filtered Results Stats</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {filteredStats.total}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">Total Classifications</div>
+        {/* Statistics Card */ }
+        { filteredStats && (
+          <Card className="border border-content3/40 bg-content1/80">
+            <CardHeader>
+              <h2 className="text-xl font-semibold text-foreground">Filtered Results Statistics</h2>
+            </CardHeader>
+            <CardBody>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="bg-content2">
+                  <CardBody className="text-center">
+                    <div className="text-3xl font-bold text-primary">
+                      { filteredStats.total }
+                    </div>
+                    <div className="text-sm text-default-500">Classifications</div>
+                  </CardBody>
+                </Card>
+                <Card className="bg-content2">
+                  <CardBody className="text-center">
+                    <div className="text-3xl font-bold text-success">
+                      { formatSalary(filteredStats.highest) }
+                    </div>
+                    <div className="text-sm text-default-500">Highest Salary</div>
+                  </CardBody>
+                </Card>
+                <Card className="bg-content2">
+                  <CardBody className="text-center">
+                    <div className="text-3xl font-bold text-warning">
+                      { formatSalary(filteredStats.average) }
+                    </div>
+                    <div className="text-sm text-default-500">Average Salary</div>
+                  </CardBody>
+                </Card>
+                <Card className="bg-content2">
+                  <CardBody className="text-center">
+                    <div className="text-3xl font-bold text-secondary">
+                      { formatSalary(filteredStats.lowest) }
+                    </div>
+                    <div className="text-sm text-default-500">Lowest Salary</div>
+                  </CardBody>
+                </Card>
               </div>
-              <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {formatSalary(filteredStats.highest)}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">Highest Salary</div>
-              </div>
-              <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {formatSalary(filteredStats.average)}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">Average Salary</div>
-              </div>
-              <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {formatSalary(filteredStats.lowest)}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">Lowest Salary</div>
-              </div>
-            </div>
+            </CardBody>
+          </Card>
+        ) }
+
+        {/* Results Grid */ }
+        { filteredSalaryData.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            { filteredSalaryData.map(code => {
+              const salaryInfo = getMostRecentSalaryInfo(code)
+              const topSalary = topSalaries?.[code]
+
+              return (
+                <Card
+                  key={ code }
+                  className="border border-content3/40 bg-content1/80 hover:border-primary/50 transition-colors"
+                >
+                  <CardHeader className="flex flex-col items-start gap-2">
+                    <div className="flex w-full items-center justify-between">
+                      <h3 className="text-xl font-bold text-primary">{ code }</h3>
+                      { topSalary && (
+                        <Chip color="success" variant="flat" size="sm">
+                          { formatSalary(topSalary) }
+                        </Chip>
+                      ) }
+                    </div>
+                  </CardHeader>
+                  <CardBody className="space-y-3">
+                    { salaryInfo && (
+                      <>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-default-500">Salary Range:</span>
+                            <span className="font-mono text-foreground">
+                              { formatSalary(salaryInfo.minSalary) } - { formatSalary(salaryInfo.maxSalary) }
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-default-500">Steps:</span>
+                            <span className="font-semibold text-foreground">{ salaryInfo.stepCount }</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-default-500">Effective Date:</span>
+                            <span className="text-foreground">{ salaryInfo.effectiveDate || 'N/A' }</span>
+                          </div>
+                        </div>
+
+                        <Divider />
+
+                        <div className="flex gap-2">
+                          <Button
+                            as="a"
+                            href={ `/api/${code.toLowerCase()}` }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            size="sm"
+                            variant="flat"
+                            color="primary"
+                            className="flex-1"
+                          >
+                            Full Data
+                          </Button>
+                          <Button
+                            as="a"
+                            href={ `/api/${code.toLowerCase()}/current` }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            size="sm"
+                            variant="bordered"
+                            className="flex-1"
+                          >
+                            Current Steps
+                          </Button>
+                        </div>
+                      </>
+                    ) }
+                  </CardBody>
+                </Card>
+              )
+            }) }
           </div>
-        )}
+        ) : (
+          <Card className="border border-content3/40 bg-content1/80">
+            <CardBody className="py-16 text-center">
+              <div className="space-y-2">
+                <p className="text-xl font-semibold text-default-500">No results found</p>
+                <p className="text-sm text-default-400">
+                  Try adjusting your search terms or filters
+                </p>
+              </div>
+            </CardBody>
+          </Card>
+        ) }
       </div>
-    </main>
-  );
+    </>
+  )
 }

@@ -1,6 +1,6 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
-import NextLink from 'next/link';
-import Head from 'next/head';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import NextLink from 'next/link'
+import Head from 'next/head'
 import {
   Button,
   Card,
@@ -17,25 +17,25 @@ import {
   TableHeader,
   TableRow,
   Tabs,
-} from '@heroui/react';
+} from '@heroui/react'
 
 interface SalaryData {
   [key: string]: {
     'annual-rates-of-pay': Array<{
       'effective-date': string | null;
-      [stepKey: string]: string | number | null | undefined;
-    }>;
-  };
+      [stepKey: string]: string | number | null | undefined
+    }>
+  }
 }
 
 interface TopSalaries {
-  [key: string]: number;
+  [key: string]: number
 }
 
 interface MetricTile {
-  label: string;
-  value: string;
-  helper: string;
+  label: string
+  value: string
+  helper: string
 }
 
 const formatSalary = (amount: number) =>
@@ -44,54 +44,57 @@ const formatSalary = (amount: number) =>
     currency: 'CAD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(amount)
 
 export default function Home() {
-  const [salaryData, setSalaryData] = useState<SalaryData | null>(null);
-  const [topSalaries, setTopSalaries] = useState<TopSalaries | null>(null);
-  const [popularList, setPopularList] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [salaryData, setSalaryData] = useState<SalaryData | null>(null)
+  const [topSalaries, setTopSalaries] = useState<TopSalaries | null>(null)
+  const [popularList, setPopularList] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         // Use dynamic import to avoid including cache on server-side
-        const { cachedFetch } = await import('../lib/api-cache');
-        
-        const [dataResult, topResult] = await Promise.all([
+        const { cachedFetch } = await import('../lib/api-cache')
+
+        const [dataResponse, topResponse] = await Promise.all([
           cachedFetch('/api/data', undefined, 60), // Cache for 60 minutes
           cachedFetch('/api/top', undefined, 60),
-        ]);
-        const normalizedTop: TopSalaries = topResult?.top ?? topResult ?? {};
+        ])
 
-        setSalaryData(dataResult);
-        setTopSalaries(normalizedTop);
-        setPopularList(topResult?.popular ?? []);
+        // The API returns { top: {...}, popular: [...] }
+        const topData = topResponse?.top || {}
+        const popularData = topResponse?.popular || []
+
+        setSalaryData(dataResponse)
+        setTopSalaries(topData)
+        setPopularList(popularData)
       } catch (error) {
-        console.error('Failed to load salary data', error);
+        console.error('Failed to load salary data', error)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchData();
-  }, []);
+    fetchData()
+  }, [])
 
   const allCodes = useMemo(
     () => (salaryData ? Object.keys(salaryData).sort((a, b) => a.localeCompare(b)) : []),
     [salaryData]
-  );
+  )
 
   const stats = useMemo(() => {
-    if (!topSalaries) return null;
+    if (!topSalaries) return null
 
-    const values = Object.values(topSalaries).filter((value): value is number => typeof value === 'number');
-    if (!values.length) return null;
+    const values = Object.values(topSalaries).filter((value): value is number => typeof value === 'number')
+    if (!values.length) return null
 
-    const totalCodes = values.length;
-    const highest = Math.max(...values);
-    const lowest = Math.min(...values);
-    const average = Math.round(values.reduce((acc, value) => acc + value, 0) / values.length);
+    const totalCodes = values.length
+    const highest = Math.max(...values)
+    const lowest = Math.min(...values)
+    const average = Math.round(values.reduce((acc, value) => acc + value, 0) / values.length)
 
     const tiles: MetricTile[] = [
       {
@@ -114,37 +117,37 @@ export default function Home() {
         value: formatSalary(lowest),
         helper: 'Minimum annual top-step salary recorded.',
       },
-    ];
+    ]
 
-    return tiles;
-  }, [topSalaries]);
+    return tiles
+  }, [topSalaries])
 
   const getMostRecentSalaryInfo = useCallback((code: string) => {
-    if (!salaryData || !salaryData[code]) return null;
+    if (!salaryData || !salaryData[code]) return null
 
-    const rates = salaryData[code]['annual-rates-of-pay'];
-    if (!rates || rates.length === 0) return null;
+    const rates = salaryData[code]['annual-rates-of-pay']
+    if (!rates || rates.length === 0) return null
 
-    const mostRecent = rates[rates.length - 1];
-    const steps = Object.keys(mostRecent).filter(key => key.startsWith('step-'));
-    const stepCount = steps.length;
-    const minSalary = mostRecent[steps[0]];
-    const maxSalary = mostRecent[steps[steps.length - 1]];
+    const mostRecent = rates[rates.length - 1]
+    const steps = Object.keys(mostRecent).filter(key => key.startsWith('step-'))
+    const stepCount = steps.length
+    const minSalary = mostRecent[steps[0]]
+    const maxSalary = mostRecent[steps[steps.length - 1]]
 
     return {
       effectiveDate: mostRecent['effective-date'],
       stepCount,
       minSalary: typeof minSalary === 'number' ? minSalary : parseInt(minSalary as string),
       maxSalary: typeof maxSalary === 'number' ? maxSalary : parseInt(maxSalary as string),
-    };
-  }, [salaryData]);
+    }
+  }, [salaryData])
 
-    const allClassifications = useMemo(() => {
-    if (!salaryData) return [];
-    return Object.keys(salaryData).sort((a, b) => a.localeCompare(b));
-  }, [salaryData]);
+  const allClassifications = useMemo(() => {
+    if (!salaryData) return []
+    return Object.keys(salaryData).sort((a, b) => a.localeCompare(b))
+  }, [salaryData])
 
-  const quickResults = allClassifications.slice(0, 8);
+  const quickResults = allClassifications.slice(0, 8)
 
   return (
     <>
@@ -172,13 +175,16 @@ export default function Home() {
                 </p>
               </div>
               <div className='flex flex-wrap gap-3'>
-                <Button as={NextLink} href='/search' color='primary' size='md' variant='shadow'>
+                <Button as={ NextLink } href='/search' color='primary' size='md' variant='flat'>
                   Advanced Search
                 </Button>
-                <Button as={NextLink} href='/equivalency' color='secondary' size='md' variant='flat'>
+                <Button as={ NextLink } href='/equivalency' color='secondary' size='md' variant='flat'>
                   Find Equivalencies
                 </Button>
-                <Button as={NextLink} href='/admin' size='md' variant='bordered'>
+                <Button as={ NextLink } href='/deployment' color='success' size='md' variant='flat'>
+                  Check Deployment
+                </Button>
+                <Button as={ NextLink } href='/admin' size='md' variant='bordered'>
                   Open Admin Console
                 </Button>
               </div>
@@ -192,23 +198,23 @@ export default function Home() {
               </CardHeader>
               <CardBody className='gap-2'>
                 <div className='flex flex-wrap gap-2'>
-                  {(popularList.length ? popularList : ['IT', 'AS', 'PM', 'EC', 'FI', 'IS']).map((code) => (
+                  { (popularList.length ? popularList : ['IT', 'AS', 'PM', 'EC', 'FI', 'IS']).map((code) => (
                     <Chip
-                      key={code}
+                      key={ code }
                       variant='flat'
                       color='primary'
                       className='cursor-pointer'
-                      as={NextLink}
-                      href={`/search?searchTerm=${encodeURIComponent(code)}`}
+                      as={ NextLink }
+                      href={ `/search?searchTerm=${encodeURIComponent(code)}` }
                     >
-                      {code}
+                      { code }
                     </Chip>
-                  ))}
+                  )) }
                 </div>
                 <Divider className='bg-content3/40' />
                 <div className='space-y-2 text-xs text-default-500'>
                   <p>Need raw data? The API is open:</p>
-                  <Button as={NextLink} href='/api/data' size='sm' variant='bordered' className='w-fit'>
+                  <Button as={ NextLink } href='/api/data' size='sm' variant='bordered' className='w-fit'>
                     View JSON payload
                   </Button>
                 </div>
@@ -217,19 +223,19 @@ export default function Home() {
           </CardBody>
         </Card>
 
-        {stats && (
+        { stats && (
           <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-            {stats.map((metric) => (
-              <Card key={metric.label} className='border border-content3/40 bg-content1/80'>
+            { stats.map((metric) => (
+              <Card key={ metric.label } className='border border-content3/40 bg-content1/80'>
                 <CardBody className='space-y-2'>
-                  <p className='text-xs uppercase tracking-wide text-default-500'>{metric.label}</p>
-                  <p className='text-2xl font-semibold text-foreground'>{metric.value}</p>
-                  <p className='text-xs text-default-500'>{metric.helper}</p>
+                  <p className='text-xs uppercase tracking-wide text-default-500'>{ metric.label }</p>
+                  <p className='text-2xl font-semibold text-foreground'>{ metric.value }</p>
+                  <p className='text-xs text-default-500'>{ metric.helper }</p>
                 </CardBody>
               </Card>
-            ))}
+            )) }
           </div>
-        )}
+        ) }
 
 
 
@@ -238,46 +244,46 @@ export default function Home() {
             <div>
               <h2 className='text-xl font-semibold text-foreground'>Classification overview</h2>
               <p className='text-sm text-default-500'>
-                {allClassifications.length.toLocaleString('en-CA')} classifications available.
+                { allClassifications.length.toLocaleString('en-CA') } classifications available.
               </p>
             </div>
           </CardHeader>
           <Divider className='bg-content3/40' />
-          {loading ? (
+          { loading ? (
             <div className='flex items-center justify-center p-16'>
               <Spinner color='primary' label='Loading salary data' />
             </div>
           ) : (
             <CardBody className='space-y-8'>
               <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-                {quickResults.map((code) => {
-                  const info = getMostRecentSalaryInfo(code);
-                  const top = topSalaries?.[code];
+                { quickResults.map((code) => {
+                  const info = getMostRecentSalaryInfo(code)
+                  const top = topSalaries?.[code]
 
                   return (
-                    <Card key={code} className='border border-content3/30 bg-content2/60'>
+                    <Card key={ code } className='border border-content3/30 bg-content2/60'>
                       <CardBody className='space-y-2'>
                         <div className='flex items-center justify-between'>
                           <Chip color='primary' variant='flat' radius='sm'>
-                            {code}
+                            { code }
                           </Chip>
-                          {top ? (
-                            <span className='text-sm font-medium text-foreground'>{formatSalary(top)}</span>
-                          ) : null}
+                          { top ? (
+                            <span className='text-sm font-medium text-foreground'>{ formatSalary(top) }</span>
+                          ) : null }
                         </div>
-                        {info ? (
+                        { info ? (
                           <div className='space-y-1 text-xs text-default-500'>
-                            <p>Range: {formatSalary(info.minSalary)} - {formatSalary(info.maxSalary)}</p>
-                            <p>Steps: {info.stepCount}</p>
-                            {info.effectiveDate && <p>Effective: {info.effectiveDate}</p>}
+                            <p>Range: { formatSalary(info.minSalary) } - { formatSalary(info.maxSalary) }</p>
+                            <p>Steps: { info.stepCount }</p>
+                            { info.effectiveDate && <p>Effective: { info.effectiveDate }</p> }
                           </div>
                         ) : (
                           <p className='text-xs text-default-500'>No recent salary information.</p>
-                        )}
+                        ) }
                         <div className='flex gap-2 pt-2'>
                           <Button
-                            as={NextLink}
-                            href={`/api/${code.toLowerCase()}`}
+                            as={ NextLink }
+                            href={ `/api/${code.toLowerCase()}` }
                             size='sm'
                             variant='bordered'
                             className='flex-1'
@@ -285,8 +291,8 @@ export default function Home() {
                             API
                           </Button>
                           <Button
-                            as={NextLink}
-                            href={`/search?searchTerm=${encodeURIComponent(code)}`}
+                            as={ NextLink }
+                            href={ `/search?searchTerm=${encodeURIComponent(code)}` }
                             size='sm'
                             color='primary'
                             variant='flat'
@@ -297,8 +303,8 @@ export default function Home() {
                         </div>
                       </CardBody>
                     </Card>
-                  );
-                })}
+                  )
+                }) }
               </div>
 
               <Table aria-label='Classification salary table' className='border border-content3/40' removeWrapper>
@@ -317,39 +323,39 @@ export default function Home() {
                       : 'No classifications available.'
                   }
                 >
-                  {allClassifications.map((code) => {
-                    const info = getMostRecentSalaryInfo(code);
-                    const top = topSalaries?.[code];
+                  { allClassifications.map((code) => {
+                    const info = getMostRecentSalaryInfo(code)
+                    const top = topSalaries?.[code]
                     return (
-                      <TableRow key={code}>
+                      <TableRow key={ code }>
                         <TableCell>
-                          <span className='font-semibold text-foreground'>{code}</span>
+                          <span className='font-semibold text-foreground'>{ code }</span>
                         </TableCell>
                         <TableCell>
-                          {info ? (
+                          { info ? (
                             <span className='text-sm text-default-500'>
-                              {formatSalary(info.minSalary)} - {formatSalary(info.maxSalary)}
+                              { formatSalary(info.minSalary) } - { formatSalary(info.maxSalary) }
                             </span>
                           ) : (
                             <span className='text-xs text-default-500'>Unavailable</span>
-                          )}
+                          ) }
                         </TableCell>
-                        <TableCell>{top ? formatSalary(top) : '—'}</TableCell>
-                        <TableCell>{info?.stepCount ?? '—'}</TableCell>
-                        <TableCell>{info?.effectiveDate ?? '—'}</TableCell>
+                        <TableCell>{ top ? formatSalary(top) : '—' }</TableCell>
+                        <TableCell>{ info?.stepCount ?? '—' }</TableCell>
+                        <TableCell>{ info?.effectiveDate ?? '—' }</TableCell>
                         <TableCell>
                           <div className='flex gap-2'>
                             <Button
-                              as={NextLink}
-                              href={`/api/${code.toLowerCase()}`}
+                              as={ NextLink }
+                              href={ `/api/${code.toLowerCase()}` }
                               size='sm'
                               variant='light'
                             >
                               API
                             </Button>
                             <Button
-                              as={NextLink}
-                              href={`/search?searchTerm=${encodeURIComponent(code)}`}
+                              as={ NextLink }
+                              href={ `/search?searchTerm=${encodeURIComponent(code)}` }
                               size='sm'
                               variant='flat'
                               color='primary'
@@ -359,16 +365,16 @@ export default function Home() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
+                    )
+                  }) }
                 </TableBody>
               </Table>
             </CardBody>
-          )}
+          ) }
         </Card>
       </div>
     </>
-  );
+  )
 }
 
 
