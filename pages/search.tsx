@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import NextLink from 'next/link'
 import Head from 'next/head'
+import { useRouter } from 'next/router'
 import {
   Autocomplete,
   AutocompleteItem,
@@ -13,6 +14,7 @@ import {
   Input,
   Spinner,
 } from '@heroui/react'
+import { Home, Filter, External } from '../components/Icons'
 
 interface SalaryData {
   [key: string]: {
@@ -35,7 +37,7 @@ interface SalaryInfo {
 }
 
 export default function SearchPage() {
-  const [searchTerm, setSearchTerm] = useState('')
+  const router = useRouter()
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null)
   const [minTopSalary, setMinTopSalary] = useState('')
   const [maxTopSalary, setMaxTopSalary] = useState('')
@@ -46,15 +48,10 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const classifications = [
-    'AC', 'AG', 'AI', 'AR', 'AS', 'AU', 'BI', 'CAI', 'CH', 'CM', 'CO', 'CR', 'CS', 'CX',
-    'DA-CON', 'DA-PRO', 'DD', 'DE', 'DS', 'EC', 'EDS', 'EG', 'ETP', 'EX', 'FB', 'FI',
-    'FO', 'FR', 'FS', 'GT', 'HPS', 'HR', 'IS', 'IT', 'LI', 'LS', 'MA', 'MD-MOF', 'MD-MSP',
-    'MT', 'ND-ADV', 'ND-DIT', 'ND-HME', 'NU-EMA', 'OE-BEO', 'OE-CEO', 'OE-DEO', 'OE-MEO',
-    'OE-MSE', 'OM', 'PC', 'PE', 'PG', 'PH', 'PI', 'PM', 'PO-IMA', 'PO-TCO', 'PRS', 'PS',
-    'PY', 'RO', 'SE-REM', 'SE-RES', 'SG-PAT', 'SG-SRE', 'SO-INS', 'ST-COR', 'ST-OCE',
-    'ST-SCY', 'ST-STN', 'ST-TYP', 'SW-CHA', 'SW-SCW', 'TI', 'TR', 'UT', 'VM', 'WP'
-  ]
+  // Dynamically load classifications from actual data instead of hardcoded array
+  const classifications = useMemo(() => {
+    return salaryData ? Object.keys(salaryData).sort() : []
+  }, [salaryData])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -70,13 +67,6 @@ export default function SearchPage() {
 
         setSalaryData(dataResponse)
         setTopSalaries(topData)
-
-        // Check for searchTerm in URL params
-        const urlParams = new URLSearchParams(window.location.search)
-        const searchTermParam = urlParams.get('searchTerm')
-        if (searchTermParam) {
-          setSearchTerm(searchTermParam)
-        }
       } catch (err) {
         console.error(err)
         setError('Unable to load salary data. Please try again later.')
@@ -87,6 +77,14 @@ export default function SearchPage() {
 
     fetchData()
   }, [])
+
+  // Handle searchTerm query parameter from URL
+  useEffect(() => {
+    if (router.isReady && router.query.searchTerm) {
+      const searchTerm = router.query.searchTerm as string
+      setSelectedClassification(searchTerm.toUpperCase())
+    }
+  }, [router.isReady, router.query.searchTerm])
 
   const formatSalary = useCallback((amount: number) => {
     return new Intl.NumberFormat('en-CA', {
@@ -126,12 +124,6 @@ export default function SearchPage() {
 
     let filtered = Object.keys(salaryData)
 
-    if (searchTerm) {
-      filtered = filtered.filter(key =>
-        key.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
     if (selectedClassification) {
       filtered = filtered.filter(key =>
         key.startsWith(selectedClassification.toUpperCase())
@@ -167,7 +159,7 @@ export default function SearchPage() {
     }
 
     return filtered.sort()
-  }, [salaryData, searchTerm, selectedClassification, minSteps, maxSteps, minTopSalary, maxTopSalary, topSalaries, getMostRecentSalaryInfo])
+  }, [salaryData, selectedClassification, minSteps, maxSteps, minTopSalary, maxTopSalary, topSalaries, getMostRecentSalaryInfo])
 
   const filteredStats = useMemo(() => {
     if (filteredSalaryData.length === 0 || !topSalaries) return null
@@ -245,7 +237,7 @@ export default function SearchPage() {
                 salary ranges, step counts, and classification families.
               </p>
             </div>
-            <Button as={ NextLink } href="/" variant="bordered" size="sm">
+            <Button as={ NextLink } href="/" color="primary" variant="solid" size="sm" startContent={ <Home className="w-4 h-4" /> }>
               Back to Home
             </Button>
           </CardHeader>
@@ -254,20 +246,7 @@ export default function SearchPage() {
         {/* Search and Filter Card */ }
         <Card className="border border-content3/40 bg-content1/80">
           <CardBody className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Search Classifications"
-                placeholder="e.g., CS-01, AS, PM..."
-                variant="bordered"
-                size="lg"
-                value={ searchTerm }
-                onValueChange={ setSearchTerm }
-                isClearable
-                classNames={ {
-                  base: 'w-full',
-                } }
-              />
-
+            <div className="grid gap-4 md:grid-cols-1">
               <Autocomplete
                 label="Classification Family"
                 placeholder="Select classification family"
@@ -340,13 +319,13 @@ export default function SearchPage() {
               <p className="text-sm text-default-500">
                 Showing <span className="font-semibold text-foreground">{ filteredSalaryData.length }</span> results
               </p>
-              { (searchTerm || selectedClassification || minTopSalary || maxTopSalary || minSteps || maxSteps) && (
+              { (selectedClassification || minTopSalary || maxTopSalary || minSteps || maxSteps) && (
                 <Button
                   size="sm"
-                  variant="flat"
-                  color="default"
+                  variant="solid"
+                  color="primary"
+                  startContent={ <Filter className="w-4 h-4" /> }
                   onPress={ () => {
-                    setSearchTerm('')
                     setSelectedClassification(null)
                     setMinTopSalary('')
                     setMaxTopSalary('')
@@ -457,9 +436,10 @@ export default function SearchPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             size="sm"
-                            variant="flat"
+                            variant="solid"
                             color="primary"
                             className="flex-1"
+                            startContent={ <External className="w-3 h-3" /> }
                           >
                             Full Data
                           </Button>
@@ -469,8 +449,10 @@ export default function SearchPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             size="sm"
-                            variant="bordered"
+                            variant="solid"
+                            color="primary"
                             className="flex-1"
+                            startContent={ <External className="w-3 h-3" /> }
                           >
                             Current Steps
                           </Button>

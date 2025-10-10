@@ -18,6 +18,7 @@ import {
     TableHeader,
     TableRow,
 } from '@heroui/react'
+import { Compare, Deploy } from '../components/Icons'
 
 interface SalaryData {
     [key: string]: {
@@ -243,7 +244,7 @@ export default function DeploymentPage() {
                                 Treasury Board&apos;s inter-step increment methodology.
                             </p>
                         </div>
-                        <Button as={ NextLink } href="/equivalency" variant="bordered" size="sm">
+                        <Button as={ NextLink } href="/equivalency" color="primary" variant="solid" size="sm" startContent={ <Compare className="w-4 h-4" /> }>
                             Compare Equivalencies
                         </Button>
                     </CardHeader>
@@ -295,10 +296,12 @@ export default function DeploymentPage() {
                         <Button
                             color="primary"
                             size="lg"
+                            variant="solid"
                             className="w-full font-semibold sm:w-auto"
                             onPress={ calculateDeployment }
                             isDisabled={ !fromCode || !toCode || calculating }
                             isLoading={ calculating }
+                            startContent={ !calculating ? <Deploy className="w-4 h-4" /> : undefined }
                         >
                             { calculating ? 'Calculating...' : 'Check Eligibility' }
                         </Button>

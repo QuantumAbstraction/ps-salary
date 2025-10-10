@@ -18,6 +18,7 @@ import {
   TableRow,
   Tabs,
 } from '@heroui/react'
+import { Search, Compare, Deploy, Settings } from '../components/Icons'
 
 interface SalaryData {
   [key: string]: {
@@ -86,15 +87,29 @@ export default function Home() {
   )
 
   const stats = useMemo(() => {
-    if (!topSalaries) return null
+    if (!salaryData || !topSalaries) return null
 
-    const values = Object.values(topSalaries).filter((value): value is number => typeof value === 'number')
-    if (!values.length) return null
+    const topValues = Object.values(topSalaries).filter((value): value is number => typeof value === 'number')
+    if (!topValues.length) return null
 
-    const totalCodes = values.length
-    const highest = Math.max(...values)
-    const lowest = Math.min(...values)
-    const average = Math.round(values.reduce((acc, value) => acc + value, 0) / values.length)
+    // Calculate min salaries (step-1 of each classification)
+    const minSalaries: number[] = []
+    Object.keys(salaryData).forEach(code => {
+      const rates = salaryData[code]['annual-rates-of-pay']
+      if (!rates || rates.length === 0) return
+      const mostRecent = rates[rates.length - 1]
+      const firstStepKey = Object.keys(mostRecent).find(k => k === 'step-1')
+      if (firstStepKey) {
+        const val = mostRecent[firstStepKey]
+        const num = typeof val === 'number' ? val : Number(String(val).replace(/[^0-9.]/g, ''))
+        if (!Number.isNaN(num)) minSalaries.push(num)
+      }
+    })
+
+    const totalCodes = topValues.length
+    const highest = Math.max(...topValues)
+    const lowest = minSalaries.length > 0 ? Math.min(...minSalaries) : Math.min(...topValues)
+    const average = Math.round(topValues.reduce((acc, value) => acc + value, 0) / topValues.length)
 
     const tiles: MetricTile[] = [
       {
@@ -113,14 +128,14 @@ export default function Home() {
         helper: 'Mean of all top-step salaries in the dataset.',
       },
       {
-        label: 'Lowest top salary',
+        label: 'Lowest starting salary',
         value: formatSalary(lowest),
-        helper: 'Minimum annual top-step salary recorded.',
+        helper: 'Minimum annual step-1 salary across all classifications.',
       },
     ]
 
     return tiles
-  }, [topSalaries])
+  }, [topSalaries, salaryData])
 
   const getMostRecentSalaryInfo = useCallback((code: string) => {
     if (!salaryData || !salaryData[code]) return null
@@ -175,16 +190,16 @@ export default function Home() {
                 </p>
               </div>
               <div className='flex flex-wrap gap-3'>
-                <Button as={ NextLink } href='/search' color='primary' size='md' variant='flat'>
+                <Button as={ NextLink } href='/search' color='primary' size='md' variant='solid' startContent={ <Search className="w-4 h-4" /> }>
                   Advanced Search
                 </Button>
-                <Button as={ NextLink } href='/equivalency' color='secondary' size='md' variant='flat'>
+                <Button as={ NextLink } href='/equivalency' color='primary' size='md' variant='solid' startContent={ <Compare className="w-4 h-4" /> }>
                   Find Equivalencies
                 </Button>
-                <Button as={ NextLink } href='/deployment' color='success' size='md' variant='flat'>
+                <Button as={ NextLink } href='/deployment' color='primary' size='md' variant='solid' startContent={ <Deploy className="w-4 h-4" /> }>
                   Check Deployment
                 </Button>
-                <Button as={ NextLink } href='/admin' size='md' variant='bordered'>
+                <Button as={ NextLink } href='/admin' color='primary' size='md' variant='solid' startContent={ <Settings className="w-4 h-4" /> }>
                   Open Admin Console
                 </Button>
               </div>

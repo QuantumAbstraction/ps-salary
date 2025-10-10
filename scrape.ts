@@ -82,6 +82,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const clean = (s: unknown) =>
 	String(s ?? '')
+		// Normalize ALL dash variations to regular hyphen-minus (U+002D)
+		// U+2010 Hyphen ‐
+		// U+2011 Non-breaking hyphen ‑
+		// U+2012 Figure dash ‒
+		// U+2013 En dash –
+		// U+2014 Em dash —
+		// U+2015 Horizontal bar ―
+		// U+2212 Minus sign −
+		.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-')
 		.replace(/\s+/g, ' ')
 		.trim();
 
@@ -93,13 +102,12 @@ const parseMoney = (s: string) => {
 const parseRange = (s: string): [number, number] | null => {
 	if (!s || !s.trim()) return null;
 	const orig = s.trim();
-	// Normalize common dashes and spacey separators
-	let txt = orig.replace(/\u2013|\u2014/g, '-').replace(/\s+to\s+/i, ' - ');
-	txt = txt.replace(/\s*‑\s*/g, ' - '); // odd dash
+	// Normalize ALL dash types to regular hyphen and spacey separators
+	let txt = orig.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, '-').replace(/\s+to\s+/i, ' - ');
 
 	// Try patterns in a conservative order.
 	// 1) explicit numeric pairs: "12,345 - 23,456" or "12.3 - 23.4"
-	const m1 = txt.match(/([\d,\.]+)\s*[-–—]\s*([\d,\.]+)/);
+	const m1 = txt.match(/([\d,\.]+)\s*-\s*([\d,\.]+)/);
 	if (m1) {
 		const a = Number(m1[1].replace(/[^\d.]/g, ''));
 		const b = Number(m1[2].replace(/[^\d.]/g, ''));
@@ -146,7 +154,14 @@ const firstClassificationIn = (s: string) => {
 	//  - "AI, Air Traffic Control" -> "AI"
 	//  - "CS-01" -> "CS-01"
 	//  - "NU-CHN-03" -> "NU-CHN-03"
+	//  - "AS‐1" (with various dashes) -> "AS-01"
 	const txt = clean(s || '');
+
+	// Special case: "AS – Development" or similar developmental rates
+	// Only match if we explicitly see "Development" or "Developmental" with AS
+	if (/\bAS\s*[-‐‑‒–—―]\s*Develop(ment|mental)\b/i.test(txt)) {
+		return 'AS-DEV';
+	}
 
 	const patterns: RegExp[] = [
 		// Pattern: ABC-DEF-12 or ABC-12 (letters groups with trailing digits)
@@ -160,10 +175,16 @@ const firstClassificationIn = (s: string) => {
 	for (const re of patterns) {
 		const m = txt.match(re);
 		if (!m || !m[1]) continue;
-		const cand = m[1].replace(/[,:;.]$/g, '');
+		let cand = m[1].replace(/[,:;.]$/g, '');
 		// Ignore single-letter Appendix markers like "A" and common words
 		if (/^[A-Z]$/.test(cand)) continue;
 		if (/^appendix$/i.test(cand)) continue;
+
+		// Normalize single-digit level codes to zero-padded format (AS-1 -> AS-01)
+		cand = cand.replace(/^([A-Z]{2,4})-(\d)$/, (match, letters, digit) => {
+			return `${letters}-0${digit}`;
+		});
+
 		return cand;
 	}
 	return null;
@@ -179,6 +200,21 @@ function dedupe<T>(arr: T[], keyFn: (x: T) => string): T[] {
 		out.push(x);
 	}
 	return out;
+}
+
+function sortSalaryData(data: SalaryData): SalaryData {
+	// Sort classification codes alphabetically
+	const sorted: SalaryData = {};
+	const keys = Object.keys(data).sort((a, b) => {
+		// Sort alphabetically, case-insensitive
+		return a.toUpperCase().localeCompare(b.toUpperCase());
+	});
+
+	for (const key of keys) {
+		sorted[key] = data[key];
+	}
+
+	return sorted;
 }
 
 /* ---------------- HTML helpers ---------------- */
@@ -602,7 +638,12 @@ function findAppendixOrRatesStarts($: any) {
 		.map((e: any) => $(e));
 	return all.filter(($h: any) => {
 		const t = clean($h.text()).toLowerCase();
-		return /appendix\s*a\b/.test(t) || /\brates of pay\b/.test(t) || /\brates\b/.test(t);
+		return (
+			/appendix\s*a\b/.test(t) ||
+			/\b(annual\s+)?rates\s+of\s+pay\b/.test(t) ||
+			/\brates\b/.test(t) ||
+			/\bsalary\s+rates\b/.test(t)
+		);
 	});
 }
 
@@ -855,6 +896,7 @@ function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
 				let rowClass: string | null = null;
 
 				// Try multiple approaches to find classification in this row
+				// Look in first 3 columns for classification codes
 				for (let cellIndex = 0; cellIndex < Math.min(3, row.length); cellIndex++) {
 					const cellText = clean(row[cellIndex] ?? '');
 					const foundClass = firstClassificationIn(cellText);
@@ -862,33 +904,17 @@ function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
 						rowClass = foundClass;
 						break;
 					}
-				}
 
-				// Special handling for AS tables - look for salary ranges to infer level
-				if (!rowClass && useClass && useClass.startsWith('AS')) {
-					// Look for salary values in the row to infer AS level
-					const salaryValues: number[] = [];
-					for (let j = 1; j < row.length; j++) {
-						const cellValue = clean(row[j] ?? '');
-						const money = parseMoney(cellValue);
-						if (!Number.isNaN(money) && money > 30000 && money < 200000) {
-							salaryValues.push(money);
-						}
-					}
-
-					if (salaryValues.length > 0) {
-						const maxSalary = Math.max(...salaryValues);
-						// Infer AS level based on salary range
-						if (maxSalary >= 82000 && maxSalary <= 92000) {
-							rowClass = 'AS-04';
-						} else if (maxSalary >= 98000 && maxSalary <= 105000) {
-							rowClass = 'AS-05';
-						} else if (maxSalary >= 108000 && maxSalary <= 115000) {
-							rowClass = 'AS-06';
-						} else if (maxSalary >= 118000 && maxSalary <= 130000) {
-							rowClass = 'AS-07';
-						} else if (maxSalary >= 130000 && maxSalary <= 145000) {
-							rowClass = 'AS-08';
+					// Additional aggressive pattern matching for variations like "AS 1" or just "1" in AS tables
+					if (!foundClass && useClass && useClass.startsWith('AS')) {
+						// Look for standalone digits 1-8 that might be AS levels
+						const digitMatch = cellText.match(/^\s*(\d)\s*$/);
+						if (digitMatch && digitMatch[1]) {
+							const level = digitMatch[1];
+							if (parseInt(level) >= 1 && parseInt(level) <= 8) {
+								rowClass = `AS-0${level}`;
+								break;
+							}
 						}
 					}
 				}
@@ -1031,17 +1057,20 @@ async function main() {
 		log('Starting scraper');
 		const data = await scrapeAll(URLS);
 
+		// Sort the data alphabetically by classification code
+		const sortedData = sortSalaryData(data);
+
 		// In serverless environments, return the data instead of writing to file
 		// (serverless file systems are read-only except /tmp)
 		if (isServerless()) {
 			log('Serverless environment detected - returning data');
-			return data;
+			return sortedData;
 		}
 
 		// In local/non-serverless environments, write to file as before
-		await fs.writeFile(OUTPUT_JSON, JSON.stringify(data, null, 2), 'utf-8');
+		await fs.writeFile(OUTPUT_JSON, JSON.stringify(sortedData, null, 2), 'utf-8');
 		log(`Saved ${OUTPUT_JSON}`);
-		return data;
+		return sortedData;
 	} catch (e: unknown) {
 		log(`Fatal error: ${(e as Error).message}`);
 		process.exitCode = 1;
@@ -1093,4 +1122,4 @@ async function runLocalTestIfRequested() {
 	if (!didLocal) await main();
 })();
 
-export { main, scrapeAppendixAFromPage, scrapeAll, URLS };
+export { main, scrapeAppendixAFromPage, scrapeAll, parseAppendixFromDocument, sortSalaryData, URLS };

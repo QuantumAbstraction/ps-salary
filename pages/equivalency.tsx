@@ -16,6 +16,7 @@ import {
   Tab,
   Tabs,
 } from '@heroui/react'
+import { Deploy, Search, External } from '../components/Icons'
 
 interface SalaryData {
   [key: string]: {
@@ -55,7 +56,6 @@ export default function EquivalencyPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCode, setSelectedCode] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
   const [tolerancePercent, setTolerancePercent] = useState(6)
   const [comparisonType, setComparisonType] = useState<ComparisonType>('top')
 
@@ -155,12 +155,6 @@ export default function EquivalencyPage() {
       .sort((a, b) => a.code.localeCompare(b.code))
   }, [allCodes, comparisonType, selectedCode, tolerancePercent, getClassificationInfo])
 
-  const filterableCodes = useMemo(() => {
-    if (!allCodes.length) return []
-    if (!searchTerm) return allCodes
-    return allCodes.filter((code) => code.toLowerCase().includes(searchTerm.trim().toLowerCase()))
-  }, [allCodes, searchTerm])
-
   return (
     <>
       <Head>
@@ -183,10 +177,10 @@ export default function EquivalencyPage() {
               </p>
             </div>
             <div className='flex gap-2'>
-              <Button as={ NextLink } href='/deployment' variant='bordered' size='sm'>
+              <Button as={ NextLink } href='/deployment' color='primary' variant='solid' size='sm' startContent={ <Deploy className="w-4 h-4" /> }>
                 Check Deployment
               </Button>
-              <Button as={ NextLink } href='/search' variant='bordered' size='sm'>
+              <Button as={ NextLink } href='/search' color='primary' variant='solid' size='sm' startContent={ <Search className="w-4 h-4" /> }>
                 Back to Search
               </Button>
             </div>
@@ -195,20 +189,7 @@ export default function EquivalencyPage() {
 
         <Card className='border border-content3/40 bg-content1/80'>
           <CardBody className='space-y-6'>
-            <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-              <Input
-                label='Filter codes'
-                placeholder='Type to narrow the list'
-                variant='bordered'
-                size='md'
-                color='default'
-                value={ searchTerm }
-                onValueChange={ setSearchTerm }
-                classNames={ {
-                  input: 'text-foreground',
-                  inputWrapper: 'bg-background border-content3'
-                } }
-              />
+            <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
               <Autocomplete
                 label='Reference classification'
                 placeholder='Select a classification'
@@ -216,7 +197,7 @@ export default function EquivalencyPage() {
                 selectedKey={ selectedCode ?? undefined }
                 onSelectionChange={ (key) => setSelectedCode(typeof key === 'string' ? key : null) }
               >
-                { filterableCodes.map((code) => (
+                { allCodes.map((code) => (
                   <AutocompleteItem key={ code }>{ code }</AutocompleteItem>
                 )) }
               </Autocomplete>
@@ -355,7 +336,7 @@ export default function EquivalencyPage() {
                             </div>
                             <Divider className='bg-content3/40' />
                             <div className='flex gap-2'>
-                              <Button as={ NextLink } href={ `/api/${info.code.toLowerCase()}` } size='sm' variant='light' className='flex-1'>
+                              <Button as={ NextLink } href={ `/api/${info.code.toLowerCase()}` } size='sm' color='primary' variant='solid' className='flex-1' startContent={ <External className="w-3 h-3" /> }>
                                 API
                               </Button>
                               <Button
@@ -363,8 +344,9 @@ export default function EquivalencyPage() {
                                 href={ `/search?searchTerm=${encodeURIComponent(info.code)}` }
                                 size='sm'
                                 color='primary'
-                                variant='flat'
+                                variant='solid'
                                 className='flex-1'
+                                startContent={ <Search className="w-3 h-3" /> }
                               >
                                 Inspect
                               </Button>
