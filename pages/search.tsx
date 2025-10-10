@@ -258,11 +258,8 @@ export default function SearchPage() {
                   base: 'w-full',
                 } }
               >
-                <AutocompleteItem key="" value="">
-                  All Classifications
-                </AutocompleteItem>
                 { classifications.map(classification => (
-                  <AutocompleteItem key={ classification } value={ classification }>
+                  <AutocompleteItem key={ classification }>
                     { classification }
                   </AutocompleteItem>
                 )) }

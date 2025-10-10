@@ -267,7 +267,7 @@ export default function DeploymentPage() {
                                 } }
                             >
                                 { allCodes.map((code) => (
-                                    <AutocompleteItem key={ code } value={ code }>
+                                    <AutocompleteItem key={ code }>
                                         { code }
                                     </AutocompleteItem>
                                 )) }
@@ -286,7 +286,7 @@ export default function DeploymentPage() {
                                 } }
                             >
                                 { allCodes.map((code) => (
-                                    <AutocompleteItem key={ code } value={ code }>
+                                    <AutocompleteItem key={ code }>
                                         { code }
                                     </AutocompleteItem>
                                 )) }
