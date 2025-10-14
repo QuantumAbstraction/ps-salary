@@ -16,11 +16,19 @@
 
 import { load } from 'cheerio';
 import * as fs from 'fs/promises';
+import { hybridParse, usageTracker, parseTableWithAI } from './lib/ai-parser';
 
 /* ---------------- configuration ---------------- */
 
 const OUTPUT_JSON = 'data/data.json';
 const POLITE_DELAY_MS = 100;
+
+// AI-assisted parsing configuration
+const USE_AI_PARSING = process.env.USE_AI_PARSING === 'true';
+const FORCE_AI = process.env.FORCE_AI === 'true'; // Always use AI (for testing)
+
+// URLs that have complex table structures and should use AI parsing
+const PROBLEMATIC_URLS = ['as.html', 'gl.html', '/ex.html', 'co-rcmp.html', 'sv.html', 'hp.html', 'hs.html'];
 
 // Paste the full list of URLs here. These should be the "rates" pages or main
 // collective agreement pages. Fragments are ignored; the whole page is parsed.
@@ -52,7 +60,35 @@ const URLS: string[] = [
 	'https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/sv.html',
 	'https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/tc.html',
 	'https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/tr.html',
-	'https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ut.html'
+	'https://www.canada.ca/en/treasury-board-secretariat/topics/pay/collective-agreements/ut.html',
+	// Unrepresented senior excluded employees (managerial and confidential positions)
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/as.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/ao.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/co-rcmp.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/ct.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/cx.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/ds.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/ed.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/ex.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/fr.html',
+	// 'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/gt.html', // 404 - page doesn't exist
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/hr.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/is.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/lc.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/md.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/mt.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/nu.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/om.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/pe.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/pi.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/pm.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/pg.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/sg.html',
+	// 'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/sr-w.html', // 404 - page doesn't exist
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/so.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/tr.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/ut.html',
+	'https://www.canada.ca/en/treasury-board-secretariat/services/pay/rates-pay/rates-pay-unrepresented-senior-excluded-employees/wp.html'
 ];
 
 /* ---------------- types ---------------- */
@@ -723,10 +759,20 @@ function parseAppendixInNodes($: any, nodes: any[], sourceUrl?: string) {
 	return out;
 }
 
-function mergeData(a: SalaryData, b: SalaryData) {
+function mergeData(a: SalaryData, b: SalaryData, sourceUrl?: string) {
+	const isUnrepresented = sourceUrl?.includes('rates-pay-unrepresented');
+
 	for (const k of Object.keys(b)) {
-		if (!a[k]) a[k] = { 'annual-rates-of-pay': [] };
-		a[k]['annual-rates-of-pay'].push(...b[k]['annual-rates-of-pay']);
+		let finalKey = k;
+
+		// If this is from the unrepresented page AND the code already exists,
+		// add "-EXCLUDED" suffix to distinguish it from collective agreement rates
+		if (isUnrepresented && a[k]) {
+			finalKey = `${k}-EXCLUDED`;
+		}
+
+		if (!a[finalKey]) a[finalKey] = { 'annual-rates-of-pay': [] };
+		a[finalKey]['annual-rates-of-pay'].push(...b[k]['annual-rates-of-pay']);
 	}
 }
 
@@ -817,7 +863,194 @@ async function fetchPage(url: string): Promise<string> {
 async function scrapeAppendixAFromPage(url: string): Promise<SalaryData> {
 	const html = await fetchPage(url);
 	const $ = load(html);
+
+	// Check if this URL should use AI parsing
+	const shouldUseAI = FORCE_AI || (USE_AI_PARSING && PROBLEMATIC_URLS.some((pattern) => url.includes(pattern)));
+
+	if (shouldUseAI) {
+		try {
+			log(`🤖 Using AI parsing for ${url}`);
+			const result = await hybridParse(html, url, ($) => parseAppendixFromDocument($, url));
+
+			if (result.success) {
+				log(`✅ AI parsing successful (method: ${result.method}, cost: $${result.cost.toFixed(3)})`);
+				usageTracker.trackCall(result);
+
+				// Convert AI format to internal format
+				if (result.method === 'ai-text' && result.data.length > 0) {
+					const converted: SalaryData = {};
+					result.data.forEach((entry) => {
+						const rates: RatesEntry = {
+							'effective-date': entry.effectiveDate,
+							_source: entry.source
+						};
+						entry.steps.forEach((step) => {
+							rates[`step-${step.step}`] = step.amount;
+						});
+						if (!converted[entry.classification]) {
+							converted[entry.classification] = { 'annual-rates-of-pay': [] };
+						}
+						converted[entry.classification]['annual-rates-of-pay'].push(rates);
+					});
+					return converted;
+				}
+			} else {
+				log(`⚠️ AI parsing failed, falling back to DOM parser`);
+			}
+		} catch (aiError) {
+			log(`⚠️ AI parsing error: ${aiError instanceof Error ? aiError.message : String(aiError)}`);
+			log(`   Falling back to DOM parser`);
+		}
+	}
+
+	// Use simplified parser for unrepresented pages
+	if (url?.includes('rates-pay-unrepresented')) {
+		return parseUnrepresentedPage($, url);
+	}
+
 	return parseAppendixFromDocument($, url);
+}
+/**
+ * Simplified parser for unrepresented senior excluded employee pages.
+ * These pages have a simpler structure with tables containing captions like:
+ * "Code: 30100<br>AS-07 – Annual rates of pay (in dollars)"
+ */
+function parseUnrepresentedPage($: any, sourceUrl?: string): SalaryData {
+	const result: SalaryData = {};
+
+	// Map RCMP rank names to classification codes
+	const rcmpRankMap: { [key: string]: string } = {
+		inspector: 'CO-RCMP-01',
+		superintendent: 'CO-RCMP-02',
+		'chief superintendent': 'CO-RCMP-03',
+		'assistant commissioner (1)': 'CO-RCMP-04',
+		'assistant commissioner (2)': 'CO-RCMP-05',
+		'deputy commissioner': 'CO-RCMP-06'
+	};
+
+	// Find all tables on the page
+	const tables = $('table').toArray();
+
+	for (const tableElem of tables) {
+		const $table = $(tableElem);
+
+		// Get the caption text which contains the classification code
+		const captionText = clean($table.find('caption').first().text());
+
+		// Extract classification from caption (e.g., "AS-07", "EX-01")
+		let classification = firstClassificationIn(captionText);
+
+		// Check for RCMP rank-based classifications
+		if (!classification) {
+			const captionLower = captionText.toLowerCase();
+			for (const [rank, code] of Object.entries(rcmpRankMap)) {
+				if (captionLower.includes(rank)) {
+					classification = code;
+					break;
+				}
+			}
+		}
+
+		if (!classification) {
+			// Try looking for classification in heading before table
+			const $prevHeading = $table.prevAll('h1,h2,h3,h4,h5,h6').first();
+			if ($prevHeading && $prevHeading.length) {
+				classification = firstClassificationIn(clean($prevHeading.text()));
+			}
+
+			if (!classification) continue;
+		} // Parse the table structure
+		const { headers, rows } = simpleTable($, $table);
+
+		if (!headers.length || !rows.length) continue;
+
+		// Find the "Effective Date" column and salary step columns
+		const dateColIndex = headers.findIndex((h) => /effective\s*date/i.test(clean(h)));
+		if (dateColIndex === -1) continue;
+
+		// Find all step columns (step-1, step-2, etc. or just numeric columns)
+		const stepColumns: { index: number; stepNum: number; isMinMax?: boolean }[] = [];
+		for (let i = 0; i < headers.length; i++) {
+			if (i === dateColIndex) continue;
+
+			const headerText = clean(headers[i]);
+			// Match "Step 1", "Step-1", or just "1", "2", "3"
+			const stepMatch = headerText.match(/step[-\s]*(\d+)/i) || headerText.match(/^(\d+)$/);
+			if (stepMatch) {
+				stepColumns.push({ index: i, stepNum: parseInt(stepMatch[1], 10) });
+			}
+			// Check for Minimum/Maximum columns (RCMP ranks)
+			else if (/minimum/i.test(headerText)) {
+				stepColumns.push({ index: i, stepNum: 1, isMinMax: true });
+			} else if (/maximum/i.test(headerText)) {
+				stepColumns.push({ index: i, stepNum: 2, isMinMax: true });
+			}
+		}
+
+		// If no step columns found, look for any numeric columns after date
+		if (stepColumns.length === 0) {
+			for (let i = dateColIndex + 1; i < headers.length; i++) {
+				// Assume columns after date are steps in order
+				stepColumns.push({ index: i, stepNum: i - dateColIndex });
+			}
+		}
+
+		if (stepColumns.length === 0) continue;
+
+		// Initialize classification entry
+		if (!result[classification]) {
+			result[classification] = { 'annual-rates-of-pay': [] };
+		}
+
+		// Process each row
+		for (const row of rows) {
+			const dateText = clean(row[dateColIndex] ?? '');
+			if (!dateText) continue;
+
+			const entry: RatesEntry = {
+				'effective-date': dateText
+			};
+
+			// Add source URL for tracking
+			if (sourceUrl) {
+				(entry as any)._source = sourceUrl;
+			}
+
+			// Extract salary values for each step
+			for (const { index, stepNum } of stepColumns) {
+				const cellText = clean(row[index] ?? '');
+				if (!cellText) continue;
+
+				// Check if cell contains a range (e.g., "100,220 to 114,592")
+				const rangeMatch = cellText.match(/(\d[\d,]+)\s+to\s+(\d[\d,]+)/i);
+				if (rangeMatch) {
+					// Split range into step-1 (minimum) and step-2 (maximum)
+					const minAmount = parseMoney(rangeMatch[1]);
+					const maxAmount = parseMoney(rangeMatch[2]);
+					if (minAmount !== null && minAmount > 0) {
+						entry['step-1'] = minAmount;
+					}
+					if (maxAmount !== null && maxAmount > 0) {
+						entry['step-2'] = maxAmount;
+					}
+				} else {
+					// Single value - treat as normal step
+					const amount = parseMoney(cellText);
+					if (amount !== null && amount > 0) {
+						entry[`step-${stepNum}`] = amount;
+					}
+				}
+			}
+
+			// Only add entry if it has at least one salary step
+			const hasSteps = Object.keys(entry).some((k) => k.startsWith('step-'));
+			if (hasSteps) {
+				result[classification]['annual-rates-of-pay'].push(entry);
+			}
+		}
+	}
+
+	return result;
 }
 
 function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
@@ -1014,7 +1247,7 @@ async function scrapeAll(urls: string[]): Promise<SalaryData> {
 			const classificationCount = Object.keys(pageData).length;
 
 			if (classificationCount > 0) {
-				mergeData(result, pageData);
+				mergeData(result, pageData, url); // Pass URL to track source
 				log(`✓ Success: ${url} -> ${classificationCount} classifications`);
 				ok++;
 			} else {
@@ -1035,6 +1268,18 @@ async function scrapeAll(urls: string[]): Promise<SalaryData> {
 	if (failed.length > 0) {
 		log(`\nFailed URLs (${failed.length}):`);
 		failed.forEach((url) => log(`  - ${url}`));
+	}
+
+	// Display AI usage statistics if AI was used
+	if (USE_AI_PARSING || FORCE_AI) {
+		const stats = usageTracker.getStats();
+		if (stats.totalCalls > 0) {
+			log(`\n📊 AI Usage Statistics:`);
+			log(`   Total AI calls: ${stats.totalCalls}`);
+			log(`   Successful: ${stats.successfulCalls} (${(stats.successRate * 100).toFixed(1)}%)`);
+			log(`   Total cost: $${stats.totalCost.toFixed(3)}`);
+			log(`   Average cost per call: $${stats.averageCost.toFixed(4)}`);
+		}
 	}
 
 	return result;

@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import Head from 'next/head'
 import {
   Accordion,
@@ -14,6 +14,7 @@ import {
   ScrollShadow,
   Skeleton,
   Spacer,
+  Switch,
   type ChipProps,
 } from '@heroui/react'
 import { Upload } from '../components/Icons'
@@ -88,13 +89,27 @@ export default function Admin() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [persistedTotal, setPersistedTotal] = useState<number | null>(null)
 
+  // AI settings
+  const [useAI, setUseAI] = useState(false)
+  const [forceAI, setForceAI] = useState(false)
+
   // Progress tracking
   const [progress, setProgress] = useState<number>(0)
   const [currentUrl, setCurrentUrl] = useState<string>('')
   const [currentStatus, setCurrentStatus] = useState<string>('')
   const [urlsProcessed, setUrlsProcessed] = useState<number>(0)
   const [totalUrls, setTotalUrls] = useState<number>(0)
+  const [logs, setLogs] = useState<string[]>([])
+  const [aiStats, setAiStats] = useState<{ calls: number; cost: number; successful: number } | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const logsEndRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll logs to bottom
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [logs])
 
   const statusMeta = useMemo(() => {
     if (isLoading) return { label: 'Running', color: 'warning' as ChipProps['color'] }
@@ -113,6 +128,13 @@ export default function Admin() {
     setCurrentStatus('')
     setUrlsProcessed(0)
     setTotalUrls(0)
+    setLogs([])
+    setAiStats(null)
+
+    const addLog = (message: string) => {
+      const timestamp = new Date().toLocaleTimeString()
+      setLogs(prev => [...prev, `[${timestamp}] ${message}`])
+    }
 
     // Close any existing EventSource
     if (eventSourceRef.current) {
@@ -120,10 +142,20 @@ export default function Admin() {
     }
 
     try {
-      console.info('[admin] Starting scraper with streaming...')
+      addLog('🚀 Starting scraper...')
+      if (useAI) {
+        addLog(forceAI ? '🤖 AI mode: FORCE (all pages)' : '🤖 AI mode: HYBRID (problematic pages only)')
+      } else {
+        addLog('📄 AI mode: DISABLED (DOM parsing only)')
+      }
 
-      // Use EventSource for Server-Sent Events
-      const eventSource = new EventSource('/api/scraper-stream')
+      // Use EventSource for Server-Sent Events with AI parameters
+      const params = new URLSearchParams()
+      if (useAI) params.append('useAI', 'true')
+      if (forceAI) params.append('forceAI', 'true')
+
+      const url = `/api/scraper-stream${params.toString() ? '?' + params.toString() : ''}`
+      const eventSource = new EventSource(url)
       eventSourceRef.current = eventSource
 
       eventSource.addEventListener('start', (e) => {
@@ -131,6 +163,7 @@ export default function Admin() {
         console.info('[admin] Scraper started, total URLs:', data.total)
         setTotalUrls(data.total)
         setCurrentStatus('Starting scraper...')
+        addLog(`📊 Processing ${data.total} URLs`)
       })
 
       eventSource.addEventListener('progress', (e) => {
@@ -143,11 +176,23 @@ export default function Admin() {
 
         if (data.status === 'fetching') {
           setCurrentStatus(`Fetching ${data.url}...`)
+          addLog(`📥 Fetching: ${data.url}`)
         } else if (data.status === 'parsed') {
           const codesText = data.codesFound > 0
-            ? ` (${data.codesFound} codes${data.codes ? ': ' + data.codes.join(', ') + (data.codesFound > 5 ? '...' : '') : ''})`
+            ? ` (${data.codesFound} codes${data.codes ? ': ' + data.codes.slice(0, 5).join(', ') + (data.codesFound > 5 ? '...' : '') : ''})`
             : ''
-          setCurrentStatus(`Parsed ${data.url}${codesText}`)
+
+          // Add AI info if available
+          const aiInfo = data.aiUsed
+            ? ` | 🤖 AI: ${data.aiMethod}, cost: $${data.aiCost?.toFixed(4) || '0.00'}, confidence: ${(data.aiConfidence * 100)?.toFixed(0) || '0'}%`
+            : data.aiUsed === false
+              ? ' | 📄 DOM parsing'
+              : ''
+
+          setCurrentStatus(`Parsed ${data.url}${codesText}${aiInfo}`)
+          addLog(`✅ Parsed: ${data.url}${codesText}${aiInfo}`)
+        } else if (data.status === 'error') {
+          addLog(`❌ Error: ${data.url} - ${data.error || 'Unknown error'}`)
         }
       })
 
@@ -157,6 +202,15 @@ export default function Admin() {
 
         setProgress(100)
         setCurrentStatus('Scraper completed successfully!')
+        addLog('🎉 Scraper completed successfully!')
+
+        // Log AI statistics if available
+        if (data.aiStats) {
+          setAiStats(data.aiStats)
+          addLog(`📊 AI Statistics: ${data.aiStats.calls} calls, ${data.aiStats.successful} successful (${((data.aiStats.successful / data.aiStats.calls) * 100).toFixed(1)}%), total cost: $${data.aiStats.cost.toFixed(4)}`)
+        }
+
+        addLog(`📈 Processed ${data.processedClassifications} classifications, ${data.newClassifications} new`)
 
         // Build result object
         const finalResult: ScraperResponse = {
@@ -178,8 +232,12 @@ export default function Admin() {
             const summary = buildGroupSummary(salaryData)
             setGroupStats(summary)
             console.table(summary.map(({ group, total }) => ({ group, total })))
+            addLog(`📋 Generated group summary for ${summary.length} groups`)
           })
-          .catch(err => console.error('[admin] Error fetching data for summary:', err))
+          .catch(err => {
+            console.error('[admin] Error fetching data for summary:', err)
+            addLog(`⚠️ Error generating group summary: ${err.message}`)
+          })
 
         eventSource.close()
         eventSourceRef.current = null
@@ -300,27 +358,95 @@ export default function Admin() {
             </Chip>
           </CardHeader>
           <CardBody className="space-y-6">
-            <div className="flex flex-wrap items-center gap-4">
-              <Button
-                color="primary"
-                size="lg"
-                variant="solid"
-                onPress={ runScraper }
-                isLoading={ isLoading }
-                startContent={ !isLoading ? <Upload className="w-4 h-4" /> : undefined }
-              >
-                Run Scraper
-              </Button>
-              { lastUpdated && (
-                <Chip variant="bordered" color="secondary" radius="sm">
-                  Last run: { formatTimestamp(lastUpdated) }
-                </Chip>
-              ) }
-              { persistedTotal !== null && (
-                <Chip variant="bordered" radius="sm">
-                  Stored records: { formatNumber(persistedTotal) }
-                </Chip>
-              ) }
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <Button
+                  color="primary"
+                  size="lg"
+                  variant="solid"
+                  onPress={ runScraper }
+                  isLoading={ isLoading }
+                  startContent={ !isLoading ? <Upload className="w-4 h-4" /> : undefined }
+                >
+                  Run Scraper
+                </Button>
+                { lastUpdated && (
+                  <Chip variant="bordered" color="secondary" radius="sm">
+                    Last run: { formatTimestamp(lastUpdated) }
+                  </Chip>
+                ) }
+                { persistedTotal !== null && (
+                  <Chip variant="bordered" radius="sm">
+                    Stored records: { formatNumber(persistedTotal) }
+                  </Chip>
+                ) }
+              </div>
+
+              <Card className="border border-content3/40 bg-content2/40">
+                <CardHeader className="pb-2">
+                  <p className="text-sm font-semibold text-foreground">🤖 AI Settings</p>
+                </CardHeader>
+                <CardBody className="space-y-3">
+                  <Switch
+                    isSelected={ useAI }
+                    onValueChange={ setUseAI }
+                    isDisabled={ isLoading }
+                    size="sm"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <p className="text-sm">Enable AI-Assisted Parsing</p>
+                      <p className="text-xs text-default-400">
+                        Use GPT-4 for complex table formats (hybrid mode: ~$0.15 per scrape)
+                      </p>
+                    </div>
+                  </Switch>
+
+                  { useAI && (
+                    <Switch
+                      isSelected={ forceAI }
+                      onValueChange={ setForceAI }
+                      isDisabled={ isLoading }
+                      size="sm"
+                      color="warning"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <p className="text-sm">Force AI for All Pages</p>
+                        <p className="text-xs text-default-400">
+                          Override smart detection and use AI for every URL (~$0.84 per scrape)
+                        </p>
+                      </div>
+                    </Switch>
+                  ) }
+
+                  { aiStats && (
+                    <div className="mt-2 p-3 rounded-lg bg-primary-500/10 border border-primary-500/30">
+                      <p className="text-xs font-semibold text-primary-200 mb-2">Last Run AI Stats</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-default-400">API Calls:</span>
+                          <span className="ml-2 text-foreground font-medium">{ aiStats.calls }</span>
+                        </div>
+                        <div>
+                          <span className="text-default-400">Successful:</span>
+                          <span className="ml-2 text-foreground font-medium">
+                            { aiStats.successful } ({ ((aiStats.successful / aiStats.calls) * 100).toFixed(1) }%)
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-default-400">Total Cost:</span>
+                          <span className="ml-2 text-foreground font-medium">${ aiStats.cost.toFixed(4) }</span>
+                        </div>
+                        <div>
+                          <span className="text-default-400">Avg Cost:</span>
+                          <span className="ml-2 text-foreground font-medium">
+                            ${ (aiStats.cost / aiStats.calls).toFixed(4) }
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) }
+                </CardBody>
+              </Card>
             </div>
 
             { isLoading && (
@@ -358,6 +484,31 @@ export default function Admin() {
                       { currentStatus }
                     </p>
                   ) }
+                </CardBody>
+              </Card>
+            ) }
+
+            { logs.length > 0 && (
+              <Card className="border border-content3/40 bg-content2/60">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between w-full">
+                    <p className="text-sm font-semibold text-foreground">📝 Scraper Logs</p>
+                    <Chip size="sm" variant="flat" color="secondary" radius="sm">
+                      { logs.length } entries
+                    </Chip>
+                  </div>
+                </CardHeader>
+                <CardBody>
+                  <ScrollShadow className="h-64 overflow-y-auto">
+                    <div className="space-y-1 font-mono text-xs pr-2">
+                      { logs.map((log, index) => (
+                        <div key={ index } className="text-default-600 hover:text-foreground transition-colors">
+                          { log }
+                        </div>
+                      )) }
+                      <div ref={ logsEndRef } />
+                    </div>
+                  </ScrollShadow>
                 </CardBody>
               </Card>
             ) }

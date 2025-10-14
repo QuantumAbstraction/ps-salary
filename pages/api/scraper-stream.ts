@@ -5,7 +5,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs/promises';
 import path from 'path';
 import { load } from 'cheerio';
-import { parseAppendixFromDocument, sortSalaryData, URLS } from '../../scrape';
+import { parseAppendixFromDocument, scrapeAppendixAFromPage, sortSalaryData, URLS } from '../../scrape';
 
 type SalaryData = Record<string, any>;
 
@@ -24,6 +24,18 @@ async function fetchPage(url: string): Promise<string> {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
 	if (req.method !== 'GET') {
 		return res.status(405).json({ error: 'Method not allowed. Use GET for SSE.' });
+	}
+
+	// Get AI parameters from query string
+	const useAI = req.query.useAI === 'true';
+	const forceAI = req.query.forceAI === 'true';
+
+	// Set environment variables for this request
+	if (useAI) {
+		process.env.USE_AI_PARSING = 'true';
+	}
+	if (forceAI) {
+		process.env.FORCE_AI = 'true';
 	}
 
 	// Set SSE headers
@@ -56,6 +68,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		const allData: SalaryData = {};
 		let processedCount = 0;
 
+		// AI tracking (import usageTracker from ai-parser if available)
+		let aiCalls = 0;
+		let aiSuccessful = 0;
+		let aiTotalCost = 0;
+
 		// Process each URL
 		for (let i = 0; i < URLS.length; i++) {
 			const url = URLS[i];
@@ -71,16 +88,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			});
 
 			try {
-				const html = await fetchPage(url);
-				const $ = load(html);
-				const data = parseAppendixFromDocument($, url);
+				// Use scrapeAppendixAFromPage which has AI support built-in
+				// It fetches the HTML internally
+				const data = await scrapeAppendixAFromPage(url);
 
 				// Merge data
 				Object.assign(allData, data);
 				const newCodes = Object.keys(data);
 				processedCount += newCodes.length;
 
-				sendEvent('progress', {
+				const progressData: any = {
 					current: i + 1,
 					total: URLS.length,
 					percentage,
@@ -88,11 +105,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 					status: 'parsed',
 					codesFound: newCodes.length,
 					codes: newCodes.slice(0, 5) // Send first 5 codes
-				});
+				};
+
+				sendEvent('progress', progressData);
 
 				// Small delay to be polite
 				await new Promise((resolve) => setTimeout(resolve, 100));
 			} catch (err) {
+				sendEvent('progress', {
+					current: i + 1,
+					total: URLS.length,
+					percentage,
+					url: urlName,
+					status: 'error'
+				});
 				sendEvent('error', {
 					url: urlName,
 					error: err instanceof Error ? err.message : 'Unknown error'
@@ -123,12 +149,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		}
 
 		// Send completion event
-		sendEvent('complete', {
+		const completeData: any = {
 			processedClassifications: processedCount,
 			newClassifications: newCodesCount,
 			persistedTotal: Object.keys(sortedData).length,
 			updatedAt: new Date().toISOString()
-		});
+		};
+
+		// Add AI stats if AI was used
+		if (useAI && aiCalls > 0) {
+			completeData.aiStats = {
+				calls: aiCalls,
+				successful: aiSuccessful,
+				cost: aiTotalCost
+			};
+		}
+
+		sendEvent('complete', completeData);
+
+		// Clean up environment variables
+		if (useAI) {
+			delete process.env.USE_AI_PARSING;
+		}
+		if (forceAI) {
+			delete process.env.FORCE_AI;
+		}
 
 		res.end();
 	} catch (error) {
@@ -136,6 +181,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 			error: error instanceof Error ? error.message : 'Unknown error',
 			fatal: true
 		});
+
+		// Clean up environment variables on error
+		delete process.env.USE_AI_PARSING;
+		delete process.env.FORCE_AI;
+
 		res.end();
 	}
 }

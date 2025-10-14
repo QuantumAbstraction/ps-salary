@@ -8,7 +8,7 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
-    <NextThemesProvider { ...props }>
+    <NextThemesProvider { ...props } disableTransitionOnChange>
       { children }
     </NextThemesProvider>
   )

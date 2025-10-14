@@ -1,6 +1,12 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import NextLink from 'next/link'
 import Head from 'next/head'
+import { SUPERSEDED_CODES } from '../lib/salary-utils'
+import {
+  filterByType,
+  getSourceDescription,
+  type ClassificationType
+} from '../lib/classification-filter'
 import {
   Autocomplete,
   AutocompleteItem,
@@ -11,6 +17,8 @@ import {
   Chip,
   Divider,
   Input,
+  Select,
+  SelectItem,
   Slider,
   Spinner,
   Tab,
@@ -56,6 +64,7 @@ export default function EquivalencyPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCode, setSelectedCode] = useState<string | null>(null)
+  const [classificationType, setClassificationType] = useState<ClassificationType>('all')
   const [tolerancePercent, setTolerancePercent] = useState(6)
   const [comparisonType, setComparisonType] = useState<ComparisonType>('top')
 
@@ -86,9 +95,17 @@ export default function EquivalencyPage() {
     fetchData()
   }, [])
 
+  // Filter out superseded codes (FI replaced by CT-FIN)
+  // Also filter by classification type (collective vs unrepresented)
   const allCodes = useMemo(
-    () => (topSalaries ? Object.keys(topSalaries).sort((a, b) => a.localeCompare(b)) : []),
-    [topSalaries]
+    () => {
+      if (!topSalaries || !salaryData) return []
+      const codes = Object.keys(topSalaries)
+        .filter(code => !SUPERSEDED_CODES.has(code))
+        .sort((a, b) => a.localeCompare(b))
+      return filterByType(codes, salaryData, classificationType)
+    },
+    [topSalaries, salaryData, classificationType]
   )
 
   const getClassificationInfo = useCallback((code: string): ClassificationInfo | null => {
@@ -190,6 +207,21 @@ export default function EquivalencyPage() {
         <Card className='border border-content3/40 bg-content1/80'>
           <CardBody className='space-y-6'>
             <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+              <Select
+                label="Classification Type"
+                placeholder="Select classification type"
+                variant="bordered"
+                selectedKeys={ [classificationType] }
+                onSelectionChange={ (keys) => {
+                  const selected = Array.from(keys)[0] as ClassificationType
+                  setClassificationType(selected || 'all')
+                } }
+              >
+                <SelectItem key="all">All Classifications</SelectItem>
+                <SelectItem key="collective">Collective Agreements</SelectItem>
+                <SelectItem key="unrepresented">Unrepresented/Excluded</SelectItem>
+              </Select>
+
               <Autocomplete
                 label='Reference classification'
                 placeholder='Select a classification'
@@ -201,6 +233,7 @@ export default function EquivalencyPage() {
                   <AutocompleteItem key={ code }>{ code }</AutocompleteItem>
                 )) }
               </Autocomplete>
+
               <Slider
                 label={ `Tolerance (${tolerancePercent}%)` }
                 step={ 1 }
@@ -208,20 +241,21 @@ export default function EquivalencyPage() {
                 maxValue={ 25 }
                 value={ tolerancePercent }
                 onChange={ (value) => setTolerancePercent(Number(value)) }
-                className='md:col-span-2'
+                className='xl:col-span-1'
               />
-              <div className='md:col-span-2 xl:col-span-4'>
-                <Tabs
-                  color='primary'
-                  selectedKey={ comparisonType }
-                  onSelectionChange={ (key) => setComparisonType(key as ComparisonType) }
-                >
-                  <Tab key='top' title='Top salary' />
-                  <Tab key='max' title='Maximum' />
-                  <Tab key='average' title='Average' />
-                  <Tab key='min' title='Minimum' />
-                </Tabs>
-              </div>
+            </div>
+
+            <div className='w-full'>
+              <Tabs
+                color='primary'
+                selectedKey={ comparisonType }
+                onSelectionChange={ (key) => setComparisonType(key as ComparisonType) }
+              >
+                <Tab key='top' title='Top salary' />
+                <Tab key='max' title='Maximum' />
+                <Tab key='average' title='Average' />
+                <Tab key='min' title='Minimum' />
+              </Tabs>
             </div>
 
             <Divider className='bg-content3/40' />
@@ -300,10 +334,22 @@ export default function EquivalencyPage() {
                       return (
                         <Card key={ info.code } className='border border-content3/40 bg-content2/60'>
                           <CardBody className='space-y-3'>
-                            <div className='flex items-center justify-between'>
+                            <div className='flex items-center justify-between gap-2'>
                               <Chip color='primary' variant='flat' radius='sm'>
                                 { info.code }
                               </Chip>
+                              { salaryData && (
+                                <Chip
+                                  color={ getSourceDescription(salaryData, info.code).includes('Unrepresented') ? 'warning' : 'default' }
+                                  variant='dot'
+                                  size='sm'
+                                >
+                                  { getSourceDescription(salaryData, info.code).includes('Unrepresented') ? 'Unrepresented' : 'Collective' }
+                                </Chip>
+                              ) }
+                            </div>
+
+                            <div className='flex items-center gap-2'>
                               <Chip
                                 variant='flat'
                                 color={
@@ -361,7 +407,7 @@ export default function EquivalencyPage() {
             ) }
           </CardBody>
         </Card>
-      </div>
+      </div >
     </>
   )
 }

@@ -17,8 +17,9 @@ import {
   TableHeader,
   TableRow,
   Tabs,
+  Link,
 } from '@heroui/react'
-import { Search, Compare, Deploy, Settings } from '../components/Icons'
+import { Search, Compare, Deploy, Settings, External } from '../components/Icons'
 
 interface SalaryData {
   [key: string]: {
@@ -89,20 +90,45 @@ export default function Home() {
   const stats = useMemo(() => {
     if (!salaryData || !topSalaries) return null
 
-    const topValues = Object.values(topSalaries).filter((value): value is number => typeof value === 'number')
+    const topValues = Object.values(topSalaries).filter(
+      (value): value is number => typeof value === 'number'
+    )
     if (!topValues.length) return null
 
     // Calculate min salaries (step-1 of each classification)
+    // Only include annual salaries (>= 1000) to avoid mixing hourly/weekly/monthly rates
     const minSalaries: number[] = []
+    let collectiveCount = 0
+    let unrepresentedCount = 0
+
     Object.keys(salaryData).forEach(code => {
       const rates = salaryData[code]['annual-rates-of-pay']
       if (!rates || rates.length === 0) return
+
       const mostRecent = rates[rates.length - 1]
       const firstStepKey = Object.keys(mostRecent).find(k => k === 'step-1')
       if (firstStepKey) {
         const val = mostRecent[firstStepKey]
         const num = typeof val === 'number' ? val : Number(String(val).replace(/[^0-9.]/g, ''))
-        if (!Number.isNaN(num)) minSalaries.push(num)
+
+        // Only include annual salaries (>= 1000) in stats
+        // Hourly/weekly/monthly rates are still available in the data, just not in aggregate stats
+        if (!Number.isNaN(num) && num >= 1000) {
+          minSalaries.push(num)
+        }
+      }
+
+      // Check if unrepresented based on _source URL
+      const isUnrepresented = rates.some(rate =>
+        rate._source &&
+        typeof rate._source === 'string' &&
+        rate._source.includes('unrepresented-senior-excluded')
+      )
+
+      if (isUnrepresented) {
+        unrepresentedCount++
+      } else {
+        collectiveCount++
       }
     })
 
@@ -115,7 +141,7 @@ export default function Home() {
       {
         label: 'Total classifications',
         value: totalCodes.toLocaleString('en-CA'),
-        helper: 'Unique classification codes loaded from the dataset.',
+        helper: `${collectiveCount} collective agreement, ${unrepresentedCount} unrepresented/excluded.`,
       },
       {
         label: 'Highest top salary',
@@ -146,14 +172,45 @@ export default function Home() {
     const mostRecent = rates[rates.length - 1]
     const steps = Object.keys(mostRecent).filter(key => key.startsWith('step-'))
     const stepCount = steps.length
-    const minSalary = mostRecent[steps[0]]
-    const maxSalary = mostRecent[steps[steps.length - 1]]
+    const minSalaryRaw = mostRecent[steps[0]]
+    const maxSalaryRaw = mostRecent[steps[steps.length - 1]]
+
+    const minSalary = typeof minSalaryRaw === 'number' ? minSalaryRaw : parseInt(minSalaryRaw as string)
+    const maxSalary = typeof maxSalaryRaw === 'number' ? maxSalaryRaw : parseInt(maxSalaryRaw as string)
+
+    // Detect wage type based on value ranges
+    // Keep original values - don't convert
+    const isHourly = minSalary < 1000
+
+    // Determine rate type for display
+    let rateType: 'annual' | 'hourly' | 'weekly' | 'monthly' = 'annual'
+    if (minSalary < 100) {
+      rateType = 'hourly'
+    } else if (minSalary >= 100 && minSalary < 1000) {
+      rateType = 'weekly'
+    } else if (minSalary >= 1000 && minSalary < 10000) {
+      rateType = 'monthly'
+    }
+
+    // Check if unrepresented
+    const isUnrepresented = rates.some(rate =>
+      rate._source &&
+      typeof rate._source === 'string' &&
+      rate._source.includes('unrepresented-senior-excluded')
+    )
+
+    // Get source URL
+    const sourceUrl = typeof mostRecent._source === 'string' ? mostRecent._source : null
 
     return {
       effectiveDate: mostRecent['effective-date'],
       stepCount,
-      minSalary: typeof minSalary === 'number' ? minSalary : parseInt(minSalary as string),
-      maxSalary: typeof maxSalary === 'number' ? maxSalary : parseInt(maxSalary as string),
+      minSalary,
+      maxSalary,
+      isHourly,
+      rateType,
+      isUnrepresented,
+      sourceUrl,
     }
   }, [salaryData])
 
@@ -190,16 +247,16 @@ export default function Home() {
                 </p>
               </div>
               <div className='flex flex-wrap gap-3'>
-                <Button as={ NextLink } href='/search' color='primary' size='md' variant='solid' startContent={ <Search className="w-4 h-4" /> }>
+                <Button as={ NextLink } href='/search' color='success' size='md' variant='solid' startContent={ <Search className="w-4 h-4" /> }>
                   Advanced Search
                 </Button>
-                <Button as={ NextLink } href='/equivalency' color='primary' size='md' variant='solid' startContent={ <Compare className="w-4 h-4" /> }>
+                <Button as={ NextLink } href='/equivalency' color='secondary' size='md' variant='solid' startContent={ <Compare className="w-4 h-4" /> }>
                   Find Equivalencies
                 </Button>
-                <Button as={ NextLink } href='/deployment' color='primary' size='md' variant='solid' startContent={ <Deploy className="w-4 h-4" /> }>
+                <Button as={ NextLink } href='/deployment' color='warning' size='md' variant='solid' startContent={ <Deploy className="w-4 h-4" /> }>
                   Check Deployment
                 </Button>
-                <Button as={ NextLink } href='/admin' color='primary' size='md' variant='solid' startContent={ <Settings className="w-4 h-4" /> }>
+                <Button as={ NextLink } href='/admin' color='danger' size='md' variant='solid' startContent={ <Settings className="w-4 h-4" /> }>
                   Open Admin Console
                 </Button>
               </div>
@@ -240,15 +297,22 @@ export default function Home() {
 
         { stats && (
           <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-            { stats.map((metric) => (
-              <Card key={ metric.label } className='border border-content3/40 bg-content1/80'>
-                <CardBody className='space-y-2'>
-                  <p className='text-xs uppercase tracking-wide text-default-500'>{ metric.label }</p>
-                  <p className='text-2xl font-semibold text-foreground'>{ metric.value }</p>
-                  <p className='text-xs text-default-500'>{ metric.helper }</p>
-                </CardBody>
-              </Card>
-            )) }
+            { stats.map((metric, index) => {
+              const colors = ['primary', 'success', 'warning', 'secondary'] as const
+              const color = colors[index % colors.length]
+              return (
+                <Card key={ metric.label } className='border border-content3/40 bg-content1/80'>
+                  <CardBody className='space-y-2'>
+                    <div className='flex items-center justify-between'>
+                      <p className='text-xs uppercase tracking-wide text-default-500'>{ metric.label }</p>
+                      <Chip color={ color } size='sm' variant='dot' radius='sm'></Chip>
+                    </div>
+                    <p className={ `text-2xl font-semibold text-${color}` }>{ metric.value }</p>
+                    <p className='text-xs text-default-500'>{ metric.helper }</p>
+                  </CardBody>
+                </Card>
+              )
+            }) }
           </div>
         ) }
 
@@ -278,19 +342,43 @@ export default function Home() {
                   return (
                     <Card key={ code } className='border border-content3/30 bg-content2/60'>
                       <CardBody className='space-y-2'>
-                        <div className='flex items-center justify-between'>
-                          <Chip color='primary' variant='flat' radius='sm'>
-                            { code }
-                          </Chip>
+                        <div className='flex items-start justify-between gap-2'>
+                          <div className='flex flex-wrap gap-1'>
+                            <Chip color='primary' variant='flat' radius='sm'>
+                              { code }
+                            </Chip>
+                            { info?.rateType !== 'annual' && (
+                              <Chip color='success' variant='dot' size='sm' radius='sm'>
+                                { (info?.rateType || '').charAt(0).toUpperCase() + (info?.rateType || '').slice(1) }
+                              </Chip>
+                            ) }
+                            { info?.isUnrepresented && (
+                              <Chip color='warning' variant='dot' size='sm' radius='sm'>
+                                Excluded
+                              </Chip>
+                            ) }
+                          </div>
                           { top ? (
                             <span className='text-sm font-medium text-foreground'>{ formatSalary(top) }</span>
                           ) : null }
                         </div>
                         { info ? (
                           <div className='space-y-1 text-xs text-default-500'>
-                            <p>Range: { formatSalary(info.minSalary) } - { formatSalary(info.maxSalary) }</p>
+                            <p>Range: { formatSalary(info.minSalary) } - { formatSalary(info.maxSalary) }{ info.rateType !== 'annual' && ` (${info.rateType})` }</p>
                             <p>Steps: { info.stepCount }</p>
                             { info.effectiveDate && <p>Effective: { info.effectiveDate }</p> }
+                            { info.sourceUrl && (
+                              <Link
+                                href={ info.sourceUrl }
+                                isExternal
+                                showAnchorIcon
+                                anchorIcon={ <External className='w-3 h-3' /> }
+                                size='sm'
+                                className='text-xs'
+                              >
+                                View source
+                              </Link>
+                            ) }
                           </div>
                         ) : (
                           <p className='text-xs text-default-500'>No recent salary information.</p>
@@ -301,6 +389,7 @@ export default function Home() {
                             href={ `/api/${code.toLowerCase()}` }
                             size='sm'
                             variant='bordered'
+                            color='secondary'
                             className='flex-1'
                           >
                             API
@@ -309,7 +398,7 @@ export default function Home() {
                             as={ NextLink }
                             href={ `/search?searchTerm=${encodeURIComponent(code)}` }
                             size='sm'
-                            color='primary'
+                            color='success'
                             variant='flat'
                             className='flex-1'
                           >
@@ -329,6 +418,7 @@ export default function Home() {
                   <TableColumn key='top'>Top salary</TableColumn>
                   <TableColumn key='steps'>Steps</TableColumn>
                   <TableColumn key='effective'>Effective date</TableColumn>
+                  <TableColumn key='source'>Source</TableColumn>
                   <TableColumn key='actions'>Actions</TableColumn>
                 </TableHeader>
                 <TableBody
@@ -344,12 +434,24 @@ export default function Home() {
                     return (
                       <TableRow key={ code }>
                         <TableCell>
-                          <span className='font-semibold text-foreground'>{ code }</span>
+                          <div className='flex flex-wrap items-center gap-1'>
+                            <span className='font-semibold text-foreground'>{ code }</span>
+                            { info?.rateType !== 'annual' && (
+                              <Chip color='success' variant='dot' size='sm' radius='sm'>
+                                { (info?.rateType || '').charAt(0).toUpperCase() + (info?.rateType || '').slice(1) }
+                              </Chip>
+                            ) }
+                            { info?.isUnrepresented && (
+                              <Chip color='warning' variant='dot' size='sm' radius='sm'>
+                                Excluded
+                              </Chip>
+                            ) }
+                          </div>
                         </TableCell>
                         <TableCell>
                           { info ? (
                             <span className='text-sm text-default-500'>
-                              { formatSalary(info.minSalary) } - { formatSalary(info.maxSalary) }
+                              { formatSalary(info.minSalary) } - { formatSalary(info.maxSalary) }{ info.rateType !== 'annual' && ` (${info.rateType})` }
                             </span>
                           ) : (
                             <span className='text-xs text-default-500'>Unavailable</span>
@@ -359,12 +461,26 @@ export default function Home() {
                         <TableCell>{ info?.stepCount ?? '—' }</TableCell>
                         <TableCell>{ info?.effectiveDate ?? '—' }</TableCell>
                         <TableCell>
+                          { info?.sourceUrl ? (
+                            <Link
+                              href={ info.sourceUrl }
+                              isExternal
+                              showAnchorIcon
+                              anchorIcon={ <External className='w-3 h-3' /> }
+                              size='sm'
+                            >
+                              Link
+                            </Link>
+                          ) : '—' }
+                        </TableCell>
+                        <TableCell>
                           <div className='flex gap-2'>
                             <Button
                               as={ NextLink }
                               href={ `/api/${code.toLowerCase()}` }
                               size='sm'
                               variant='light'
+                              color='secondary'
                             >
                               API
                             </Button>
@@ -373,7 +489,7 @@ export default function Home() {
                               href={ `/search?searchTerm=${encodeURIComponent(code)}` }
                               size='sm'
                               variant='flat'
-                              color='primary'
+                              color='success'
                             >
                               Inspect
                             </Button>

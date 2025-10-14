@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import NextLink from 'next/link'
 import Head from 'next/head'
+import { getMostRecentCurrentRate, SUPERSEDED_CODES } from '../lib/salary-utils'
 import {
     Autocomplete,
     AutocompleteItem,
@@ -76,15 +77,24 @@ export default function DeploymentPage() {
         fetchData()
     }, [])
 
+
+    // List of superseded classification codes that have been replaced
+    // FI (Financial Management) has been replaced by CT-FIN (Comptrollership - Finance)
     const allCodes = useMemo(
-        () => (salaryData ? Object.keys(salaryData).sort((a, b) => a.localeCompare(b)) : []),
+        () => {
+            if (!salaryData) return []
+
+            return Object.keys(salaryData)
+                .filter(code => !SUPERSEDED_CODES.has(code))
+                .sort((a, b) => a.localeCompare(b))
+        },
         [salaryData]
     )
 
     const extractSteps = useCallback((rates: any) => {
-        if (!rates || !rates.length) return []
+        const mostRecent = getMostRecentCurrentRate(rates)
+        if (!mostRecent) return []
 
-        const mostRecent = rates[rates.length - 1]
         const stepKeys = Object.keys(mostRecent).filter((key) => key.startsWith('step-'))
 
         return stepKeys
@@ -141,17 +151,17 @@ export default function DeploymentPage() {
                 return
             }
 
-            // Step 1: Calculate minimum inter-step increment
+            // Step 1: Calculate minimum inter-step increment in the NEW position (TO position)
             let minIncrement = Infinity
-            for (let i = 0; i < fromSteps.length - 1; i++) {
-                const increment = fromSteps[i + 1] - fromSteps[i]
+            for (let i = 0; i < toSteps.length - 1; i++) {
+                const increment = toSteps[i + 1] - toSteps[i]
                 if (increment < minIncrement) {
                     minIncrement = increment
                 }
             }
 
             // Handle single-step classifications
-            if (minIncrement === Infinity || fromSteps.length === 1) {
+            if (minIncrement === Infinity || toSteps.length === 1) {
                 minIncrement = 0
             }
 
@@ -166,12 +176,12 @@ export default function DeploymentPage() {
             const isDeployable = Math.abs(salaryDifference) < minIncrement
 
             let reason = ''
-            if (fromSteps.length === 1) {
-                reason = `Note: ${fromCode.toUpperCase()} has only one step. Deployment eligibility cannot be determined using standard increment rules.`
+            if (toSteps.length === 1) {
+                reason = `Note: ${toCode.toUpperCase()} has only one step. Deployment eligibility cannot be determined using standard increment rules.`
             } else if (isDeployable) {
-                reason = `✓ Deployment allowed: The salary difference (${formatSalary(Math.abs(salaryDifference))}) is less than the minimum step increment (${formatSalary(minIncrement)}) in ${fromCode.toUpperCase()}.`
+                reason = `✓ Deployment allowed: The salary difference (${formatSalary(Math.abs(salaryDifference))}) is less than the minimum step increment (${formatSalary(minIncrement)}) in ${toCode.toUpperCase()}.`
             } else {
-                reason = `✗ Deployment not allowed: The salary difference (${formatSalary(Math.abs(salaryDifference))}) exceeds the minimum step increment (${formatSalary(minIncrement)}) in ${fromCode.toUpperCase()}.`
+                reason = `✗ Deployment not allowed: The salary difference (${formatSalary(Math.abs(salaryDifference))}) exceeds the minimum step increment (${formatSalary(minIncrement)}) in ${toCode.toUpperCase()}.`
             }
 
             setResult({
@@ -181,7 +191,7 @@ export default function DeploymentPage() {
                 toMaxSalary,
                 minIncrement,
                 salaryDifference,
-                isDeployable: fromSteps.length === 1 ? false : isDeployable,
+                isDeployable: toSteps.length === 1 ? false : isDeployable,
                 reason,
                 fromStepCount: fromSteps.length,
                 toStepCount: toSteps.length,

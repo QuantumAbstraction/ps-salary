@@ -2,6 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import NextLink from 'next/link'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
+import { SUPERSEDED_CODES } from '../lib/salary-utils'
+import {
+  filterByType,
+  getTypeLabel,
+  getSourceDescription,
+  type ClassificationType
+} from '../lib/classification-filter'
 import {
   Autocomplete,
   AutocompleteItem,
@@ -12,6 +19,8 @@ import {
   Chip,
   Divider,
   Input,
+  Select,
+  SelectItem,
   Spinner,
 } from '@heroui/react'
 import { Home, Filter, External } from '../components/Icons'
@@ -39,6 +48,7 @@ interface SalaryInfo {
 export default function SearchPage() {
   const router = useRouter()
   const [selectedClassification, setSelectedClassification] = useState<string | null>(null)
+  const [classificationType, setClassificationType] = useState<ClassificationType>('all')
   const [minTopSalary, setMinTopSalary] = useState('')
   const [maxTopSalary, setMaxTopSalary] = useState('')
   const [minSteps, setMinSteps] = useState('')
@@ -49,9 +59,15 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null)
 
   // Dynamically load classifications from actual data instead of hardcoded array
+  // Filter out superseded codes (FI replaced by CT-FIN)
+  // Also filter by classification type (collective vs unrepresented)
   const classifications = useMemo(() => {
-    return salaryData ? Object.keys(salaryData).sort() : []
-  }, [salaryData])
+    if (!salaryData) return []
+    const allCodes = Object.keys(salaryData)
+      .filter(code => !SUPERSEDED_CODES.has(code))
+      .sort()
+    return filterByType(allCodes, salaryData, classificationType)
+  }, [salaryData, classificationType])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -246,7 +262,26 @@ export default function SearchPage() {
         {/* Search and Filter Card */ }
         <Card className="border border-content3/40 bg-content1/80">
           <CardBody className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-1">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select
+                label="Classification Type"
+                placeholder="Select classification type"
+                variant="bordered"
+                size="lg"
+                selectedKeys={ [classificationType] }
+                onSelectionChange={ (keys) => {
+                  const selected = Array.from(keys)[0] as ClassificationType
+                  setClassificationType(selected || 'all')
+                } }
+                classNames={ {
+                  base: 'w-full',
+                } }
+              >
+                <SelectItem key="all">All Classifications</SelectItem>
+                <SelectItem key="collective">Collective Agreements</SelectItem>
+                <SelectItem key="unrepresented">Unrepresented/Excluded Employees</SelectItem>
+              </Select>
+
               <Autocomplete
                 label="Classification Family"
                 placeholder="Select classification family"
@@ -403,6 +438,15 @@ export default function SearchPage() {
                         </Chip>
                       ) }
                     </div>
+                    { salaryData && (
+                      <Chip
+                        color={ getSourceDescription(salaryData, code).includes('Unrepresented') ? 'warning' : 'default' }
+                        variant="flat"
+                        size="sm"
+                      >
+                        { getSourceDescription(salaryData, code) }
+                      </Chip>
+                    ) }
                   </CardHeader>
                   <CardBody className="space-y-3">
                     { salaryInfo && (
