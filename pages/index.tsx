@@ -20,6 +20,7 @@ import {
   Link,
 } from '@heroui/react'
 import { Search, Compare, Deploy, Settings, External } from '../components/Icons'
+import { cachedFetch, apiCache } from '../lib/api-cache'
 
 interface SalaryData {
   [key: string]: {
@@ -57,9 +58,6 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Use dynamic import to avoid including cache on server-side
-        const { cachedFetch } = await import('../lib/api-cache')
-
         const [dataResponse, topResponse] = await Promise.all([
           cachedFetch('/api/data', undefined, 60), // Cache for 60 minutes
           cachedFetch('/api/top', undefined, 60),
@@ -78,6 +76,9 @@ export default function Home() {
         setLoading(false)
       }
     }
+
+    // Clear cache on component mount to ensure fresh data
+    apiCache.clear()
 
     fetchData()
   }, [])
@@ -100,8 +101,14 @@ export default function Home() {
     const minSalaries: number[] = []
     let collectiveCount = 0
     let unrepresentedCount = 0
+    let hourlyCount = 0
+    let weeklyCount = 0
+    let monthlyCount = 0
 
     Object.keys(salaryData).forEach(code => {
+      // Skip SC and STD classifications - they have mixed rate types (monthly/annual/weekly/daily/hourly)
+      if (code.startsWith('SC-') || code.startsWith('STD-')) return
+
       const rates = salaryData[code]['annual-rates-of-pay']
       if (!rates || rates.length === 0) return
 
@@ -111,10 +118,18 @@ export default function Home() {
         const val = mostRecent[firstStepKey]
         const num = typeof val === 'number' ? val : Number(String(val).replace(/[^0-9.]/g, ''))
 
-        // Only include annual salaries (>= 1000) in stats
-        // Hourly/weekly/monthly rates are still available in the data, just not in aggregate stats
-        if (!Number.isNaN(num) && num >= 1000) {
-          minSalaries.push(num)
+        // Categorize by rate type
+        if (!Number.isNaN(num)) {
+          if (num < 100) {
+            hourlyCount++
+          } else if (num >= 100 && num < 1000) {
+            weeklyCount++
+          } else if (num >= 1000 && num < 10000) {
+            monthlyCount++
+          } else {
+            // Only include annual salaries (>= 10000) in min salary stats
+            minSalaries.push(num)
+          }
         }
       }
 
@@ -141,22 +156,22 @@ export default function Home() {
       {
         label: 'Total classifications',
         value: totalCodes.toLocaleString('en-CA'),
-        helper: `${collectiveCount} collective agreement, ${unrepresentedCount} unrepresented/excluded.`,
+        helper: `${collectiveCount} collective agreement, ${unrepresentedCount} unrepresented/excluded. ${hourlyCount} hourly, ${weeklyCount} weekly, ${monthlyCount} monthly rates. Excludes SC/STD (mixed rates).`,
       },
       {
         label: 'Highest top salary',
         value: formatSalary(highest),
-        helper: 'Maximum annual top-step salary recorded.',
+        helper: 'Maximum annual top-step salary recorded (excludes hourly/weekly/monthly rates, SC/STD).',
       },
       {
         label: 'Average top salary',
         value: formatSalary(average),
-        helper: 'Mean of all top-step salaries in the dataset.',
+        helper: 'Mean of all top-step salaries in the dataset (excludes hourly/weekly/monthly rates, SC/STD).',
       },
       {
         label: 'Lowest starting salary',
         value: formatSalary(lowest),
-        helper: 'Minimum annual step-1 salary across all classifications.',
+        helper: 'Minimum annual step-1 salary across all classifications (excludes hourly/weekly/monthly rates, SC/STD).',
       },
     ]
 
@@ -358,7 +373,7 @@ export default function Home() {
                               </Chip>
                             ) }
                           </div>
-                          { top ? (
+                          { top && info?.rateType === 'annual' ? (
                             <span className='text-sm font-medium text-foreground'>{ formatSalary(top) }</span>
                           ) : null }
                         </div>

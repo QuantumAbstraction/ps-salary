@@ -44,6 +44,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 		// Loop over each key (pay scale code) in jsonData
 		for (const code of Object.keys(jsonData)) {
 			try {
+				// Skip SC and STD classifications - they have mixed rate types
+				if (code.startsWith('SC-') || code.startsWith('STD-')) continue;
+
 				const entry = jsonData[code];
 				if (!entry) continue;
 				const rates = entry['annual-rates-of-pay'];
@@ -57,13 +60,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 				const val = lastRate[lastStepKey];
 				let num = typeof val === 'number' ? val : Number(String(val).replace(/[^0-9.]/g, ''));
 
-				// Convert hourly wages to annual salaries
-				// Hourly salary calculated by dividing annual by 52.176 weeks then by 37.5 hours
-				// So reverse: hourly * 37.5 * 52.176 = annual
-				if (!Number.isNaN(num) && num < 1000) {
-					num = num * 37.5 * 52.176;
-				}
-
+				// Keep original values - do NOT convert hourly/weekly/monthly to annual
+				// The UI will handle display based on rate type
 				if (!Number.isNaN(num)) topResult[code] = num;
 			} catch (e) {
 				// ignore malformed entries

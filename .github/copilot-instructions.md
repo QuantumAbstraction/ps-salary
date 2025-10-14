@@ -11,7 +11,7 @@ A Next.js 13 Pages Router application providing Canadian public service salary d
 ### Core Data Pipeline
 
 1. **Scraping** (`scrape.ts`): Fetches Treasury Board URLs, parses HTML tables with complex classification detection (including salary-range inference for AS-01 through AS-08)
-2. **Storage** (`data/data.json`): 110+ classifications with salary steps and effective dates
+2. **Storage** (`data/data.json`): 777 classifications with salary steps and effective dates (cleaned of duplicate base codes)
 3. **API Layer** (`pages/api/`): Dynamic routes serve cached data with proper response structure
 4. **Client Cache** (`lib/api-cache.ts`): 60-minute client-side TTL cache to minimize API calls
 
@@ -125,7 +125,7 @@ See `scrape.ts` lines 870-920 for salary-based classification inference logic.
 
 ### Classification Code Patterns
 
-**Total: 740 unique classification codes** in data.json with various formats:
+**Total: 777 unique classification codes** in data.json with various formats (cleaned Oct 2025 - removed 33 duplicate base codes):
 
 - **Standard XX-##**: Most common (e.g., `AS-01`, `CR-05`, `IT-03`)
 - **Developmental suffix**: `AS-DEV` (developmental level)
@@ -148,7 +148,7 @@ See `scrape.ts` lines 870-920 for salary-based classification inference logic.
 - **Three-part ED codes**: `ED-XXX-##` (e.g., `ED-LAT-01`)
 - **Base codes only**: `AIM`, `AMW`, `CO`, `COI`, `CT`, `DA`, `ED`, `EIM`, `ELE`, `EU`, `FR`, `GHW`, `HP`, `HS`, `II`, `INM`, `LI`, `LP`, `LS`, `MAM`, `MAN`, `MDO`, `MOC`, `MST`, `NP`, `NU`, `PCF`, `PIP`, `PM`, `PR`, `PRW`, `RCMP`, `SMW`, `SO`, `SR`, `ST`
 
-**CRITICAL**: Always load classifications dynamically from `Object.keys(salaryData)` - NEVER use hardcoded arrays. This ensures UI displays all 740 codes including all variations and future additions.
+**CRITICAL**: Always load classifications dynamically from `Object.keys(salaryData)` - NEVER use hardcoded arrays. This ensures UI displays all 777 codes including all variations and future additions.
 
 ## Project-Specific Conventions
 
@@ -272,7 +272,7 @@ Scraper API (`pages/api/scraper.ts`) detects serverless:
 - `components/ThemeToggle.tsx` - Theme switcher with mounted state check (NO 'use client')
 - `vercel.json` - Deployment config with caching headers (3600s max-age)
 - `DEPLOYMENT.md` - Comprehensive deployment guide
-- `data/data.json` - 740 classification codes including variations (AS-DEV, GL-XXX-##, CT-XXX-##, DA-XXX-#, EN-XXX-##, HS-XXX-##, etc.)
+- `data/data.json` - 777 classification codes including variations (AS-DEV, GL-XXX-##, CT-XXX-##, DA-XXX-#, EN-XXX-##, HS-XXX-##, etc.)
 
 ## When Adding Features
 
@@ -304,6 +304,10 @@ Scraper API (`pages/api/scraper.ts`) detects serverless:
 
 **Button Modernization**: All buttons now use `color='primary'`, `variant='solid'`, and appropriate icons from Icons.tsx
 
-**Dynamic Classifications** (search.tsx): Replaced hardcoded 70-item classification array with dynamic loading from actual data (740+ classifications including AS-DEV, GL-XXX-##, CT-XXX-##, etc.)
+**Dynamic Classifications** (search.tsx): Replaced hardcoded 70-item classification array with dynamic loading from actual data (777 classifications including AS-DEV, GL-XXX-##, CT-XXX-##, etc.)
 
 **Search Simplification**: Removed text search inputs from search.tsx and equivalency.tsx - now only dropdown classification family selector
+
+**Base Code Parsing Fix** (Oct 2025): Removed 33 duplicate base classification codes (e.g., "EX", "DS", "PM") that were incorrectly parsed alongside their leveled versions (e.g., "EX-01", "DS-01", "PM-01"). Total count: 810 → 777. See PARSING_FIX_BASE_CODES.md for details.
+
+**SC/STD Exclusion** (Oct 2025): Excluded 14 SC and STD classifications from salary statistics due to mixed rate types (monthly/annual/weekly/daily/hourly in same classification). Both pages/index.tsx and pages/api/top.ts now skip SC-_ and STD-_ codes.
