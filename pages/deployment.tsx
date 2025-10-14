@@ -131,6 +131,24 @@ export default function DeploymentPage() {
                 return
             }
 
+            // Check if annual-rates-of-pay data is available
+            if (!fromData['annual-rates-of-pay'] || !toData['annual-rates-of-pay']) {
+                setResult({
+                    fromCode: fromCode.toUpperCase(),
+                    toCode: toCode.toUpperCase(),
+                    fromMaxSalary: 0,
+                    toMaxSalary: 0,
+                    minIncrement: 0,
+                    salaryDifference: 0,
+                    isDeployable: false,
+                    reason: 'Salary data not available for one or both classifications. Some classifications (e.g., SC, STD) have complex pay structures that cannot be compared using this tool.',
+                    fromStepCount: 0,
+                    toStepCount: 0,
+                })
+                setCalculating(false)
+                return
+            }
+
             const fromSteps = extractSteps(fromData['annual-rates-of-pay'])
             const toSteps = extractSteps(toData['annual-rates-of-pay'])
 
@@ -143,7 +161,7 @@ export default function DeploymentPage() {
                     minIncrement: 0,
                     salaryDifference: 0,
                     isDeployable: false,
-                    reason: 'No valid salary steps found for one or both classifications.',
+                    reason: 'No valid salary steps found for one or both classifications. Some classifications have complex pay structures that cannot be compared using this tool.',
                     fromStepCount: fromSteps.length,
                     toStepCount: toSteps.length,
                 })
@@ -412,7 +430,7 @@ export default function DeploymentPage() {
                                         </TableRow>
                                         <TableRow>
                                             <TableCell className="font-medium">
-                                                Minimum Step Increment ({ result.fromCode })
+                                                Minimum Step Increment ({ result.toCode })
                                             </TableCell>
                                             <TableCell className="font-mono">
                                                 { formatSalary(result.minIncrement) }
@@ -445,16 +463,16 @@ export default function DeploymentPage() {
                     <CardBody className="space-y-4 text-sm text-default-700">
                         <p>
                             <strong>Deployment eligibility</strong> is determined by comparing the minimum
-                            inter-step increment within the source classification against the difference between
-                            maximum salaries of both classifications.
+                            inter-step increment within the <strong>destination classification (TO)</strong> against
+                            the difference between maximum salaries of both classifications.
                         </p>
 
                         <div className="space-y-2 rounded-lg bg-content2 p-4">
                             <h4 className="font-semibold text-foreground">Calculation Steps:</h4>
                             <ol className="list-inside list-decimal space-y-2 pl-2">
                                 <li>
-                                    Calculate the <strong>minimum inter-step increment</strong> in the source
-                                    classification (the smallest salary jump between consecutive steps)
+                                    Calculate the <strong>minimum inter-step increment</strong> in the <strong>destination
+                                        (TO)</strong> classification (the smallest salary jump between consecutive steps)
                                 </li>
                                 <li>
                                     Find the <strong>maximum salaries</strong> for both classifications (top step)
@@ -463,8 +481,8 @@ export default function DeploymentPage() {
                                     Calculate the <strong>difference</strong> between the two maximum salaries
                                 </li>
                                 <li>
-                                    If the absolute difference is <strong>less than</strong> the minimum increment,
-                                    deployment is allowed
+                                    If the absolute difference is <strong>less than</strong> the minimum increment
+                                    in the <strong>destination (TO)</strong> classification, deployment is allowed
                                 </li>
                             </ol>
                         </div>
@@ -472,7 +490,7 @@ export default function DeploymentPage() {
                         <div className="rounded-lg border border-primary/40 bg-primary-50/50 p-4 dark:bg-primary-950/20">
                             <p className="text-sm">
                                 <strong>Formula:</strong> |Maximum Salary (To) - Maximum Salary (From)| &lt; Minimum
-                                Increment (From)
+                                Increment (To)
                             </p>
                         </div>
 
