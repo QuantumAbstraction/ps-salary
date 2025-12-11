@@ -785,7 +785,10 @@ function parseAppendixInNodes($: any, nodes: any[], sourceUrl?: string) {
 			}
 
 			// Find the maximum step number in existing merged entry
-			let maxStep = existingSteps.size > 0 ? Math.max(...existingSteps.keys()) : 0;
+			let maxStep = 0;
+			existingSteps.forEach((stepNum) => {
+				if (stepNum > maxStep) maxStep = stepNum;
+			});
 
 			// Sort new steps by their original number to maintain order
 			newSteps.sort((a, b) => a[0] - b[0]);
@@ -1322,7 +1325,10 @@ function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
 			}
 
 			// Find the maximum step number in existing merged entry
-			let maxStep = existingSteps.size > 0 ? Math.max(...existingSteps.keys()) : 0;
+			let maxStep = 0;
+			existingSteps.forEach((stepNum) => {
+				if (stepNum > maxStep) maxStep = stepNum;
+			});
 
 			// Sort new steps by their original number to maintain order
 			newSteps.sort((a, b) => a[0] - b[0]);
