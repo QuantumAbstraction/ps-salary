@@ -199,7 +199,7 @@ export default function DeploymentPage() {
             } else if (isDeployable) {
                 reason = `✓ Deployment allowed: The salary difference (${formatSalary(Math.abs(salaryDifference))}) is less than the minimum step increment (${formatSalary(minIncrement)}) in ${toCode.toUpperCase()}.`
             } else {
-                reason = `✗ Deployment not allowed: The salary difference (${formatSalary(Math.abs(salaryDifference))}) exceeds the minimum step increment (${formatSalary(minIncrement)}) in ${toCode.toUpperCase()}.`
+                reason = `↓ Downward Transfer/Deployment: The salary difference (${formatSalary(Math.abs(salaryDifference))}) exceeds the minimum step increment (${formatSalary(minIncrement)}) in ${toCode.toUpperCase()}.`
             }
 
             setResult({
@@ -350,14 +350,14 @@ export default function DeploymentPage() {
                                 <div
                                     className={ `flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-4xl ${result.isDeployable
                                         ? 'bg-success text-success-foreground'
-                                        : 'bg-danger text-danger-foreground'
+                                        : 'bg-warning text-warning-foreground'
                                         }` }
                                 >
-                                    { result.isDeployable ? '✓' : '✗' }
+                                    { result.isDeployable ? '✓' : '↓' }
                                 </div>
                                 <div className="flex-1 space-y-1">
                                     <h2 className="text-2xl font-bold text-foreground">
-                                        { result.isDeployable ? 'Deployment Allowed' : 'Deployment Not Allowed' }
+                                        { result.isDeployable ? 'Deployment Allowed' : 'Downward Transfer/Deployment' }
                                     </h2>
                                     <p className="text-lg text-default-700">
                                         { result.fromCode } → { result.toCode }
@@ -440,11 +440,11 @@ export default function DeploymentPage() {
                                             <TableCell className="font-medium">Deployment Decision</TableCell>
                                             <TableCell>
                                                 <Chip
-                                                    color={ result.isDeployable ? 'success' : 'danger' }
+                                                    color={ result.isDeployable ? 'success' : 'warning' }
                                                     variant="flat"
                                                     size="sm"
                                                 >
-                                                    { result.isDeployable ? 'ALLOWED' : 'NOT ALLOWED' }
+                                                    { result.isDeployable ? 'ALLOWED' : 'DOWNWARD' }
                                                 </Chip>
                                             </TableCell>
                                         </TableRow>
