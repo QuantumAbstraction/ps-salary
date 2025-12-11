@@ -738,22 +738,81 @@ function parseAppendixInNodes($: any, nodes: any[], sourceUrl?: string) {
 		}
 	}
 
-	// de-duplicate entries
+	// Merge entries with the same effective-date (handles "continued" tables)
+	// Tables split across multiple HTML tables (e.g., steps 1-4 in one table,
+	// steps 5-10 in a "(continued)" table) need their steps merged together
 	for (const k of Object.keys(out)) {
-		const seen = new Set<string>();
 		const arr = out[k]['annual-rates-of-pay'];
-		// Keep the last entry for duplicate effective-date. We'll iterate from
-		// the end, record seen dates, and then reverse to preserve original order
-		const rev: any[] = [];
-		const seenDates = new Set<string>();
-		for (let i = arr.length - 1; i >= 0; i--) {
-			const d = String(arr[i]['effective-date'] ?? '').trim();
-			if (d && !seenDates.has(d)) {
-				seenDates.add(d);
-				rev.push(arr[i]);
+		const byDate: Map<string, RatesEntry> = new Map();
+		const order: string[] = [];
+
+		for (const entry of arr) {
+			const d = String(entry['effective-date'] ?? '').trim();
+			if (!d) continue;
+
+			if (!byDate.has(d)) {
+				byDate.set(d, { 'effective-date': entry['effective-date'] } as RatesEntry);
+				order.push(d);
+			}
+
+			const merged = byDate.get(d)!;
+
+			// Collect existing step VALUES in merged entry (to detect duplicates)
+			const existingSteps: Map<number, any> = new Map();
+			const existingValues = new Set<any>();
+			for (const [key, val] of Object.entries(merged)) {
+				const m = key.match(/^step-(\d+)$/);
+				if (m) {
+					existingSteps.set(Number(m[1]), val);
+					existingValues.add(val);
+				}
+			}
+
+			// Collect new steps from this entry
+			const newSteps: Array<[number, any]> = [];
+			for (const [key, val] of Object.entries(entry)) {
+				const stepMatch = key.match(/^step-(\d+)$/);
+				if (stepMatch) {
+					newSteps.push([Number(stepMatch[1]), val]);
+				}
+			}
+
+			// Check if this is a duplicate entry: if step-1's value already exists, skip
+			const firstNewStep = newSteps.find(([n]) => n === 1);
+			if (firstNewStep && existingValues.has(firstNewStep[1])) {
+				// This entry's data already exists in merged - skip entirely
+				continue;
+			}
+
+			// Find the maximum step number in existing merged entry
+			let maxStep = existingSteps.size > 0 ? Math.max(...existingSteps.keys()) : 0;
+
+			// Sort new steps by their original number to maintain order
+			newSteps.sort((a, b) => a[0] - b[0]);
+
+			// Add new steps, continuing from maxStep
+			for (const [origNum, val] of newSteps) {
+				maxStep++;
+				merged[`step-${maxStep}`] = val;
+				// Also carry over _raw-step metadata if present
+				const rawKey = `_raw-step-${origNum}`;
+				if (entry[rawKey]) {
+					merged[`_raw-step-${maxStep}`] = entry[rawKey];
+				}
+			}
+
+			// Copy other metadata fields
+			for (const [key, val] of Object.entries(entry)) {
+				if (key === 'effective-date') continue;
+				if (key.startsWith('step-') || key.startsWith('_raw-step-')) continue;
+				if (key.startsWith('_') || key === 'group' || key === 'level') {
+					merged[key] = val as any;
+				}
 			}
 		}
-		out[k]['annual-rates-of-pay'] = rev.reverse();
+
+		// Rebuild array in original order
+		out[k]['annual-rates-of-pay'] = order.map(d => byDate.get(d)!);
 	}
 
 	return out;
@@ -1210,26 +1269,86 @@ function parseAppendixFromDocument($: any, sourceUrl?: string): SalaryData {
 		}
 	}
 
-	// Merge/sort/dedupe similar to previous behavior
+	// Sort steps in each entry
 	for (const k of Object.keys(result)) {
-		result[k]['annual-rates-of-pay'] = dedupe(result[k]['annual-rates-of-pay'].map(sortSteps), (x) =>
-			JSON.stringify(x)
-		);
+		result[k]['annual-rates-of-pay'] = result[k]['annual-rates-of-pay'].map(sortSteps);
 	}
 
-	// Keep last occurrence per effective-date
+	// Merge entries with the same effective-date (handles "continued" tables)
+	// Tables split across multiple HTML tables (e.g., steps 1-6 in one table,
+	// steps 7-10 in a "(continued)" table) need their steps merged together
 	for (const k of Object.keys(result)) {
 		const arr = result[k]['annual-rates-of-pay'];
-		const rev: any[] = [];
-		const seenDates = new Set<string>();
-		for (let i = arr.length - 1; i >= 0; i--) {
-			const d = String(arr[i]['effective-date'] ?? '').trim();
-			if (d && !seenDates.has(d)) {
-				seenDates.add(d);
-				rev.push(arr[i]);
+		const byDate: Map<string, RatesEntry> = new Map();
+		const order: string[] = [];
+
+		for (const entry of arr) {
+			const d = String(entry['effective-date'] ?? '').trim();
+			if (!d) continue;
+
+			if (!byDate.has(d)) {
+				byDate.set(d, { 'effective-date': entry['effective-date'] } as RatesEntry);
+				order.push(d);
+			}
+
+			const merged = byDate.get(d)!;
+
+			// Collect existing step VALUES in merged entry (to detect duplicates)
+			const existingSteps: Map<number, any> = new Map();
+			const existingValues = new Set<any>();
+			for (const [key, val] of Object.entries(merged)) {
+				const m = key.match(/^step-(\d+)$/);
+				if (m) {
+					existingSteps.set(Number(m[1]), val);
+					existingValues.add(val);
+				}
+			}
+
+			// Collect new steps from this entry
+			const newSteps: Array<[number, any]> = [];
+			for (const [key, val] of Object.entries(entry)) {
+				const stepMatch = key.match(/^step-(\d+)$/);
+				if (stepMatch) {
+					newSteps.push([Number(stepMatch[1]), val]);
+				}
+			}
+
+			// Check if this is a duplicate entry: if step-1's value already exists, skip
+			const firstNewStep = newSteps.find(([n]) => n === 1);
+			if (firstNewStep && existingValues.has(firstNewStep[1])) {
+				// This entry's data already exists in merged - skip entirely
+				// (This happens when parseAppendixInNodes already merged the continued tables)
+				continue;
+			}
+
+			// Find the maximum step number in existing merged entry
+			let maxStep = existingSteps.size > 0 ? Math.max(...existingSteps.keys()) : 0;
+
+			// Sort new steps by their original number to maintain order
+			newSteps.sort((a, b) => a[0] - b[0]);
+
+			// Add new steps, continuing from maxStep
+			for (const [origNum, val] of newSteps) {
+				maxStep++;
+				merged[`step-${maxStep}`] = val;
+				// Also carry over _raw-step metadata if present
+				const rawKey = `_raw-step-${origNum}`;
+				if (rawKey in entry) {
+					merged[`_raw-step-${maxStep}`] = (entry as any)[rawKey];
+				}
+			}
+
+			// Copy other metadata fields (group, level, etc.) if not already set
+			for (const [key, val] of Object.entries(entry)) {
+				if (key === 'effective-date') continue;
+				if (key.startsWith('step-') || key.startsWith('_raw-step-')) continue;
+				if (!(key in merged) || merged[key] === null || merged[key] === undefined) {
+					merged[key] = val;
+				}
 			}
 		}
-		result[k]['annual-rates-of-pay'] = rev.reverse();
+
+		result[k]['annual-rates-of-pay'] = order.map(d => byDate.get(d)!);
 	}
 
 	return result;
