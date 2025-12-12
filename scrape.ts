@@ -247,7 +247,16 @@ function sortSalaryData(data: SalaryData): SalaryData {
 	});
 
 	for (const key of keys) {
-		sorted[key] = data[key];
+		// Sort each classification's rates by effective-date (oldest first)
+		const classification = data[key];
+		if (classification['annual-rates-of-pay']) {
+			classification['annual-rates-of-pay'].sort((a, b) => {
+				const dateA = new Date(a['effective-date']).getTime();
+				const dateB = new Date(b['effective-date']).getTime();
+				return dateA - dateB;
+			});
+		}
+		sorted[key] = classification;
 	}
 
 	return sorted;
