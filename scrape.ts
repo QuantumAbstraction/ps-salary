@@ -251,8 +251,8 @@ function sortSalaryData(data: SalaryData): SalaryData {
 		const classification = data[key];
 		if (classification['annual-rates-of-pay']) {
 			classification['annual-rates-of-pay'].sort((a, b) => {
-				const dateA = new Date(a['effective-date']).getTime();
-				const dateB = new Date(b['effective-date']).getTime();
+				const dateA = new Date(a['effective-date'] || '1900-01-01').getTime();
+				const dateB = new Date(b['effective-date'] || '1900-01-01').getTime();
 				return dateA - dateB;
 			});
 		}
