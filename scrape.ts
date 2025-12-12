@@ -238,6 +238,33 @@ function dedupe<T>(arr: T[], keyFn: (x: T) => string): T[] {
 	return out;
 }
 
+/**
+ * Extract a parseable date from effective-date strings that may have prefixes
+ * like "C) October 1, 2013" or "$) Prior to October 1, 2011"
+ */
+function extractDateFromEffectiveDate(effectiveDate: string | null): Date {
+	if (!effectiveDate) return new Date('1900-01-01');
+
+	// Try to extract a date pattern: Month Day, Year (e.g., "October 1, 2013")
+	const dateMatch = effectiveDate.match(/([A-Z][a-z]+)\s+(\d{1,2}),?\s+(\d{4})/i);
+	if (dateMatch) {
+		const [, month, day, year] = dateMatch;
+		const parsed = new Date(`${month} ${day}, ${year}`);
+		if (!isNaN(parsed.getTime())) {
+			return parsed;
+		}
+	}
+
+	// Fallback: try parsing the whole string (removes prefix if Date can handle it)
+	const fallback = new Date(effectiveDate);
+	if (!isNaN(fallback.getTime())) {
+		return fallback;
+	}
+
+	// Last resort: return epoch so these sort first
+	return new Date('1900-01-01');
+}
+
 function sortSalaryData(data: SalaryData): SalaryData {
 	// Sort classification codes alphabetically
 	const sorted: SalaryData = {};
@@ -251,8 +278,8 @@ function sortSalaryData(data: SalaryData): SalaryData {
 		const classification = data[key];
 		if (classification['annual-rates-of-pay']) {
 			classification['annual-rates-of-pay'].sort((a, b) => {
-				const dateA = new Date(a['effective-date'] || '1900-01-01').getTime();
-				const dateB = new Date(b['effective-date'] || '1900-01-01').getTime();
+				const dateA = extractDateFromEffectiveDate(a['effective-date']).getTime();
+				const dateB = extractDateFromEffectiveDate(b['effective-date']).getTime();
 				return dateA - dateB;
 			});
 		}
